@@ -3,6 +3,7 @@
 *.ima
 extracted/
 merged_disks/
+game/
 
 # Build artifacts
 build/
@@ -16,3 +17,7 @@ build/
 
 # Claude Code
 .claude/
+
+# Python
+__pycache__/
+*.pyc

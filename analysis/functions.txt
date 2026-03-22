@@ -1,0 +1,773 @@
+=== Functions in game/ELFISH/ELFISH.EXE ===
+      seg112_023A  size=  337  frame=   0  insts=142
+      seg112_06C9  size=   87  frame=   0  insts=38
+      seg112_073E  size=  122  frame=   0  insts=51
+      seg112_0831  size=  198  frame=   0  insts=93
+  FAR seg112_08FC  size=   41  frame=  10  insts=29
+      seg112_0943  size=  186  frame=   0  insts=90
+      seg112_0A0F  size=  563  frame=   0  insts=244
+      seg112_0E59  size=   43  frame=   0  insts=23
+      seg112_0E84  size=   82  frame=   0  insts=39
+      seg112_1201  size=  168  frame=   0  insts=87
+      seg112_12A9  size=   34  frame=   0  insts=16
+      seg112_13AA  size=   58  frame=   0  insts=27
+      seg112_13E4  size=  163  frame=   0  insts=76
+      seg112_154B  size=   58  frame=   0  insts=28
+      seg112_158D  size=  179  frame=   0  insts=84
+      seg112_166C  size=  256  frame=   0  insts=113
+      seg112_176C  size=   73  frame=   0  insts=35
+      seg112_17B5  size=  117  frame=   0  insts=59
+      seg112_1F28  size=   54  frame=   0  insts=34
+      seg112_1F89  size=   60  frame=   2  insts=24
+  FAR seg112_1FC5  size=   59  frame=   2  insts=27
+  FAR seg112_2000  size=   35  frame=   0  insts=17
+      seg112_202E  size=   38  frame=   0  insts=17
+  FAR seg112_2054  size=   21  frame=   0  insts=12
+  FAR seg112_2069  size=   19  frame=   0  insts=12
+  FAR seg112_207C  size=   18  frame=   0  insts=10
+  FAR seg112_208E  size=   18  frame=   0  insts=10
+  FAR seg112_20A0  size=   11  frame=   0  insts=6
+  FAR seg112_20AB  size=   10  frame=   0  insts=6
+  FAR seg116_003A  size=   12  frame=   0  insts=7
+  FAR seg118_0000  size=  103  frame=   4  insts=52
+  FAR seg119_001A  size=   87  frame=   8  insts=38
+  FAR seg121_0000  size=   67  frame=   4  insts=34
+      seg125_0022  size=  118  frame=   0  insts=46
+  FAR seg126_0000  size=   94  frame=   4  insts=43
+  FAR seg126_005E  size=   68  frame=   4  insts=34
+  FAR seg128_0000  size=   83  frame=   4  insts=40
+  FAR seg129_0000  size=  200  frame=   8  insts=85
+  FAR seg130_0000  size=  208  frame=   6  insts=87
+  FAR seg131_0000  size=   50  frame=   0  insts=27
+  FAR seg131_0032  size=   54  frame=   0  insts=30
+  FAR seg131_0068  size=   35  frame=   0  insts=16
+  FAR seg131_00BA  size=   55  frame=   0  insts=29
+  FAR seg132_0000  size=   41  frame=   8  insts=15
+  FAR seg132_006E  size=   29  frame=   4  insts=13
+  FAR seg133_0000  size=  240  frame= 138  insts=108
+  FAR seg133_00F0  size=   15  frame=   0  insts=9
+  FAR seg134_001A  size=   82  frame=   4  insts=40
+  FAR seg136_0000  size=  223  frame=   0  insts=107
+  FAR seg137_0000  size=   53  frame=   0  insts=29
+  FAR seg137_0072  size=  234  frame=   4  insts=99
+  FAR seg138_0000  size=  191  frame=   4  insts=83
+  FAR seg139_00E4  size=  155  frame= 220  insts=75
+  FAR seg140_0000  size=  282  frame=   0  insts=99
+  FAR seg140_015E  size=  105  frame=   0  insts=44
+  FAR seg141_0000  size=  102  frame=  32  insts=41
+  FAR seg141_0066  size=  237  frame=  46  insts=87
+  FAR seg142_0000  size=   94  frame=   8  insts=42
+  FAR seg142_00F6  size=  272  frame=  88  insts=102
+  FAR seg143_0000  size=  216  frame=  16  insts=95
+  FAR seg143_00D8  size=  328  frame= 322  insts=123
+  FAR seg144_0000  size=  190  frame=  14  insts=90
+  FAR seg144_00BE  size=  117  frame=   0  insts=44
+  FAR seg145_0000  size=  132  frame=  78  insts=56
+  FAR seg145_0084  size=  489  frame=  82  insts=213
+  FAR seg146_0000  size=  210  frame=   6  insts=86
+  FAR seg147_00A8  size=   74  frame=   8  insts=31
+  FAR seg147_00F2  size=   74  frame=   8  insts=31
+  FAR seg147_013C  size=  126  frame=  16  insts=53
+  FAR seg147_01BA  size=   71  frame=   8  insts=33
+  FAR seg148_003A  size=  343  frame=  60  insts=141
+  FAR seg148_02AA  size=   45  frame=  10  insts=24
+  FAR seg149_0124  size=  475  frame=  24  insts=167
+  FAR seg150_0006  size=   92  frame=   8  insts=45
+  FAR seg150_0062  size=  100  frame=   8  insts=40
+  FAR seg150_00C6  size=  195  frame= 362  insts=79
+  FAR seg150_0220  size=   39  frame=  34  insts=18
+      seg151_0122  size=   35  frame=   0  insts=17
+  FAR seg151_0145  size=   24  frame=   0  insts=11
+  FAR seg152_029E  size=  173  frame=  74  insts=76
+  FAR seg153_0146  size=   50  frame=   0  insts=29
+  FAR seg153_0178  size=   40  frame=   0  insts=24
+  FAR seg153_01A0  size=   78  frame=   0  insts=40
+  FAR seg153_0215  size=   99  frame=  12  insts=53
+  FAR seg153_02AC  size=   42  frame=   0  insts=25
+  FAR seg153_02FB  size=   28  frame=   0  insts=17
+      seg154_0000  size=   87  frame=   4  insts=35
+      seg154_00FF  size=  667  frame=  94  insts=275
+  FAR seg155_0000  size=   25  frame=   0  insts=11
+  FAR seg155_005F  size=   98  frame=   0  insts=44
+  FAR seg155_011A  size=   51  frame=   0  insts=23
+  FAR seg155_01A3  size=   96  frame=   0  insts=43
+  FAR seg155_0251  size=   51  frame=   0  insts=23
+  FAR seg155_02E0  size=   27  frame=   0  insts=12
+  FAR seg156_0000  size=  134  frame=   6  insts=59
+  FAR seg156_0296  size=  337  frame=  12  insts=122
+  FAR seg157_0378  size=  127  frame= 112  insts=60
+  FAR seg158_0000  size=  214  frame=  16  insts=85
+  FAR seg158_00D6  size=  116  frame=   0  insts=46
+  FAR seg158_014A  size=  808  frame=  30  insts=289
+  FAR seg159_0000  size=  120  frame=   8  insts=52
+  FAR seg159_0078  size=  267  frame= 966  insts=107
+  FAR seg159_0368  size=  142  frame=   0  insts=54
+  FAR seg159_03F6  size=   81  frame=   4  insts=38
+  FAR seg160_0000  size=  119  frame=   0  insts=49
+  FAR seg161_007A  size=   91  frame=  78  insts=41
+  FAR seg161_0228  size=  279  frame=   8  insts=103
+  FAR seg163_0000  size=  159  frame=  10  insts=76
+  FAR seg163_011A  size=  575  frame=  28  insts=223
+  FAR seg164_0016  size=  292  frame= 180  insts=126
+  FAR seg164_013A  size=  105  frame=   4  insts=39
+  FAR seg165_0418  size=  113  frame=   0  insts=48
+      seg166_0155  size=   86  frame=   2  insts=46
+      seg166_01AB  size=   11  frame=   2  insts=6
+      seg166_01B6  size=   11  frame=   2  insts=6
+  FAR seg166_01C1  size=  198  frame=   2  insts=112
+  FAR seg166_0287  size=   13  frame=   2  insts=7
+  FAR seg166_02D3  size=   32  frame=   2  insts=18
+  FAR seg166_0391  size=   63  frame=   0  insts=30
+  FAR seg166_047C  size=   36  frame=   0  insts=22
+  FAR seg166_04A0  size=  206  frame=   0  insts=103
+  FAR seg166_056E  size=   50  frame=   0  insts=29
+  FAR seg166_05A0  size=   27  frame=   0  insts=16
+  FAR seg166_05BB  size=   27  frame=   0  insts=16
+  FAR seg167_0000  size=  166  frame=  32  insts=63
+  FAR seg167_0326  size=   91  frame=   8  insts=37
+  FAR seg167_041A  size=  154  frame=  10  insts=74
+  FAR seg167_05AA  size=   56  frame=   0  insts=25
+  FAR seg168_02EE  size=  378  frame=  74  insts=163
+  FAR seg168_0468  size=   40  frame=   0  insts=20
+  FAR seg168_0490  size=  389  frame=  22  insts=165
+  FAR seg169_0000  size=  415  frame=  24  insts=164
+  FAR seg169_061E  size=   57  frame=   4  insts=28
+  FAR seg170_0000  size=  177  frame=   4  insts=67
+  FAR seg170_0188  size=  803  frame=  24  insts=295
+  FAR seg171_0000  size=  328  frame=  10  insts=118
+  FAR seg171_0148  size=   68  frame=   4  insts=30
+  FAR seg171_018C  size=  151  frame=  18  insts=65
+  FAR seg172_0000  size=  102  frame=   4  insts=52
+  FAR seg172_0066  size=  168  frame=  14  insts=73
+  FAR seg172_010E  size=  330  frame=  28  insts=139
+  FAR seg172_0258  size=  198  frame=  16  insts=81
+  FAR seg172_031E  size=  175  frame=  12  insts=79
+  FAR seg172_05EA  size=  288  frame=  12  insts=120
+  FAR seg173_0000  size=  108  frame=   8  insts=47
+  FAR seg173_006C  size=   82  frame=   4  insts=41
+  FAR seg173_00BE  size=   68  frame=   4  insts=32
+  FAR seg173_0132  size=  269  frame=   8  insts=116
+  FAR seg173_0572  size=  462  frame= 142  insts=184
+      seg174_0014  size=   28  frame=   0  insts=22
+  FAR seg175_0000  size= 1275  frame=  72  insts=426
+  FAR seg176_0000  size=   78  frame=   0  insts=33
+  FAR seg176_004E  size= 1912  frame=2364  insts=712
+  FAR seg177_004C  size=   69  frame=   4  insts=36
+  FAR seg177_0168  size=   98  frame=  18  insts=41
+  FAR seg177_01CA  size=  123  frame=  22  insts=50
+  FAR seg177_02F2  size=  257  frame=  34  insts=113
+      seg177_0412  size=   99  frame=   4  insts=46
+  FAR seg177_05A4  size=   67  frame= 644  insts=30
+  FAR seg177_06AC  size=  194  frame=  30  insts=82
+  FAR seg177_0782  size=   18  frame=   0  insts=9
+  FAR seg178_010A  size=  199  frame=  10  insts=74
+  FAR seg178_023C  size=  111  frame=   8  insts=45
+  FAR seg178_0466  size=  337  frame=  12  insts=117
+  FAR seg178_06D8  size=  305  frame=   8  insts=116
+  FAR seg178_08B4  size=   93  frame=   6  insts=36
+  FAR seg179_0030  size=  171  frame=   6  insts=68
+  FAR seg179_0284  size=  303  frame=  76  insts=120
+  FAR seg179_045E  size=  189  frame=  74  insts=74
+  FAR seg179_0658  size=  576  frame= 140  insts=240
+  FAR seg180_0000  size=  170  frame=   4  insts=66
+  FAR seg180_00AA  size=  158  frame=  12  insts=72
+  FAR seg180_0148  size=  146  frame=  18  insts=62
+  FAR seg180_01DA  size=  163  frame=  16  insts=66
+  FAR seg180_03FE  size=  266  frame=  24  insts=104
+  FAR seg180_0508  size=  136  frame=   0  insts=56
+  FAR seg180_0590  size=  954  frame=  24  insts=329
+  FAR seg181_0000  size=   42  frame=   4  insts=19
+  FAR seg181_01CE  size=  197  frame=   4  insts=87
+  FAR seg181_0514  size=  644  frame=  38  insts=238
+  FAR seg181_0798  size=  102  frame=  10  insts=49
+  FAR seg181_07FE  size=  120  frame=   6  insts=53
+  FAR seg181_0876  size=  218  frame=   4  insts=77
+  FAR seg182_0034  size=  146  frame=   4  insts=59
+  FAR seg182_00C6  size=  266  frame=   6  insts=97
+  FAR seg182_01D0  size=  245  frame=   4  insts=98
+  FAR seg183_0016  size=  628  frame= 104  insts=233
+  FAR seg183_028A  size=  171  frame=   4  insts=76
+  FAR seg183_04EE  size=  890  frame=  32  insts=317
+  FAR seg183_0868  size=  134  frame=   4  insts=54
+  FAR seg183_08EE  size=  124  frame=  76  insts=53
+  FAR seg184_00E0  size=  316  frame=  14  insts=102
+  FAR seg184_0252  size=  226  frame=  10  insts=78
+  FAR seg184_0334  size= 1203  frame=  40  insts=403
+  FAR seg184_08AC  size=  194  frame=  14  insts=89
+  FAR seg185_04A0  size= 1230  frame= 184  insts=436
+  FAR seg186_0000  size=  147  frame=  68  insts=64
+  FAR seg186_00C4  size=  150  frame=  10  insts=66
+      seg186_017C  size=  695  frame=  78  insts=282
+  FAR seg186_050C  size=  170  frame=  16  insts=74
+  FAR seg186_05B6  size=  100  frame=   0  insts=44
+  FAR seg186_061A  size=  112  frame=   0  insts=47
+  FAR seg186_068A  size=  258  frame=  16  insts=103
+      seg186_078C  size=   32  frame=  16  insts=17
+  FAR seg187_0000  size=   54  frame=   0  insts=33
+  FAR seg187_0036  size=  120  frame=  24  insts=71
+  FAR seg187_00AE  size=  223  frame=  42  insts=131
+  FAR seg187_01AA  size=   28  frame=   0  insts=18
+  FAR seg187_0446  size=  797  frame=  62  insts=454
+  FAR seg187_08D0  size=  338  frame=  34  insts=184
+  FAR seg188_0010  size=  171  frame=  24  insts=82
+  FAR seg188_0582  size=  165  frame=  76  insts=66
+  FAR seg188_0680  size=  147  frame=   6  insts=66
+  FAR seg188_07F4  size=   90  frame=   6  insts=40
+  FAR seg188_084E  size=  142  frame=   8  insts=58
+  FAR seg188_08DC  size=  168  frame=  12  insts=70
+  FAR seg188_0984  size=  189  frame=   4  insts=81
+      seg189_0022  size=  126  frame=1008  insts=52
+  FAR seg189_0162  size=  515  frame=  16  insts=173
+  FAR seg189_053C  size=  146  frame=  28  insts=62
+  FAR seg189_05CE  size=  105  frame=   8  insts=43
+  FAR seg189_06B4  size=  258  frame=  10  insts=107
+  FAR seg189_07B6  size=  135  frame=  10  insts=58
+  FAR seg189_08A6  size=   95  frame=   4  insts=43
+  FAR seg189_098A  size=   33  frame=   0  insts=16
+  FAR seg189_09E2  size=   90  frame=   4  insts=36
+  FAR seg190_0000  size=  143  frame=   4  insts=66
+  FAR seg190_02E2  size=  526  frame= 120  insts=231
+  FAR seg190_04F0  size= 1469  frame= 222  insts=506
+  FAR seg191_002A  size=  146  frame=   8  insts=64
+  FAR seg191_00BC  size=  269  frame=   6  insts=104
+  FAR seg191_076C  size=   97  frame=   4  insts=39
+  FAR seg192_0000  size=  357  frame=  82  insts=126
+      seg192_05DC  size=  285  frame=  14  insts=132
+  FAR seg193_0000  size=  368  frame=   4  insts=135
+  FAR seg193_0170  size=   94  frame=   6  insts=45
+  FAR seg193_01CE  size=  458  frame=  90  insts=172
+  FAR seg193_0398  size=  384  frame=  84  insts=137
+  FAR seg193_0518  size=  199  frame=   8  insts=77
+  FAR seg193_0620  size=  134  frame=   4  insts=52
+  FAR seg193_06A6  size= 1212  frame=  90  insts=415
+  FAR seg194_005C  size=  145  frame=   6  insts=53
+  FAR seg194_04DA  size=  313  frame=  12  insts=116
+  FAR seg194_0648  size=  430  frame=  16  insts=165
+  FAR seg194_07F6  size=  203  frame=   0  insts=81
+  FAR seg194_0AC8  size=  161  frame=  12  insts=67
+  FAR seg195_0248  size=  133  frame=   4  insts=42
+  FAR seg195_0400  size=  157  frame=  10  insts=60
+  FAR seg195_0A7C  size=  296  frame=  18  insts=118
+  FAR seg196_0000  size=  269  frame=  86  insts=88
+  FAR seg196_016C  size=  931  frame= 246  insts=332
+  FAR seg196_060E  size=  341  frame=  26  insts=134
+  FAR seg197_0000  size=  247  frame=  10  insts=90
+  FAR seg197_0150  size=  103  frame=   4  insts=43
+  FAR seg197_07F0  size=  244  frame=  94  insts=97
+  FAR seg197_08E4  size=  211  frame=  46  insts=86
+  FAR seg197_0B06  size=  407  frame= 518  insts=145
+  FAR seg198_0020  size=  360  frame=  42  insts=173
+      seg198_0207  size=  646  frame=  40  insts=284
+  FAR seg198_048D  size=   20  frame=   0  insts=13
+  FAR seg198_054C  size=   47  frame=   4  insts=23
+      seg198_057B  size=  363  frame=  16  insts=155
+  FAR seg198_06E6  size=   90  frame=  12  insts=50
+      seg198_0740  size=  160  frame=  10  insts=71
+      seg198_07E0  size=  226  frame=   4  insts=99
+      seg198_0906  size=   59  frame=   6  insts=30
+      seg198_0941  size=  281  frame=  12  insts=117
+  FAR seg198_0A5A  size=   69  frame=   6  insts=32
+  FAR seg198_0A9F  size=  200  frame=   4  insts=92
+  FAR seg198_0B67  size=  487  frame=  18  insts=206
+  FAR seg199_0000  size=   94  frame=   6  insts=45
+  FAR seg199_005E  size=  479  frame=   4  insts=175
+  FAR seg199_08B6  size= 1234  frame= 106  insts=431
+      seg200_0057  size=  349  frame= 134  insts=136
+  FAR seg200_01B4  size=   37  frame=   0  insts=19
+  FAR seg200_01D9  size=   37  frame=   0  insts=19
+  FAR seg200_01FE  size=  200  frame=   8  insts=83
+      seg200_02C6  size=  117  frame=   4  insts=48
+  FAR seg200_033B  size=  325  frame=  14  insts=127
+  FAR seg200_057B  size=  126  frame=   4  insts=60
+      seg200_05F9  size=  152  frame=   8  insts=64
+      seg200_0691  size=  127  frame=   0  insts=50
+      seg200_07F2  size=  404  frame=   0  insts=153
+  FAR seg200_0A60  size=   82  frame=   6  insts=37
+  FAR seg200_0AD2  size=  188  frame=   6  insts=74
+  FAR seg200_0BBC  size=   96  frame=   8  insts=43
+  FAR seg200_0CB7  size=   65  frame=   4  insts=30
+  FAR seg200_0D67  size=   34  frame=   0  insts=19
+  FAR seg200_0DA8  size=   62  frame=   4  insts=32
+  FAR seg200_0DE6  size=   54  frame=   4  insts=26
+  FAR seg201_0000  size=  544  frame= 112  insts=198
+  FAR seg201_0230  size=  273  frame=   0  insts=101
+  FAR seg201_0382  size= 1122  frame=  36  insts=376
+  FAR seg201_07E4  size=  340  frame=  10  insts=122
+  FAR seg201_0938  size=  468  frame=  22  insts=166
+  FAR seg201_0B0C  size=   65  frame=  70  insts=29
+  FAR seg202_0000  size=  295  frame=   6  insts=108
+  FAR seg202_0214  size=  247  frame=  24  insts=104
+  FAR seg202_064A  size=  184  frame=   8  insts=74
+  FAR seg202_0702  size=  130  frame=   8  insts=48
+  FAR seg202_0784  size= 1327  frame=  40  insts=425
+  FAR seg203_004E  size=  201  frame=  16  insts=89
+  FAR seg203_0652  size=   65  frame=   0  insts=29
+  FAR seg203_0886  size=  468  frame=  34  insts=200
+  FAR seg203_0A5A  size=  416  frame=  16  insts=157
+  FAR seg203_0BFA  size=  734  frame=  32  insts=264
+  FAR seg204_002A  size=   30  frame=   0  insts=15
+  FAR seg204_0066  size=   29  frame=   4  insts=13
+  FAR seg204_0094  size=  107  frame=   4  insts=44
+  FAR seg204_01AA  size=  103  frame=   4  insts=40
+  FAR seg204_02D6  size=  228  frame=  14  insts=91
+  FAR seg204_03BA  size=  310  frame=  18  insts=129
+  FAR seg204_04F0  size=   29  frame=   4  insts=13
+  FAR seg204_087C  size=  283  frame=   6  insts=120
+  FAR seg204_0D4A  size=  110  frame=   0  insts=47
+  FAR seg204_0DB8  size=  650  frame=  14  insts=237
+  FAR seg205_0000  size=  140  frame=  16  insts=61
+  FAR seg205_008C  size=  126  frame=   8  insts=55
+  FAR seg205_010A  size=   81  frame=   8  insts=42
+  FAR seg205_0338  size=  184  frame=   8  insts=82
+  FAR seg205_03F0  size=  615  frame=  54  insts=240
+  FAR seg205_06A6  size=  479  frame=  12  insts=165
+  FAR seg205_0936  size=  203  frame=  20  insts=81
+  FAR seg205_0D74  size=   49  frame=   4  insts=24
+  FAR seg205_0E12  size=  135  frame=   6  insts=54
+  FAR seg205_1018  size=  177  frame=   0  insts=82
+  FAR seg206_0000  size=   52  frame=   8  insts=23
+      seg206_0034  size=   54  frame=  16  insts=21
+  FAR seg206_015C  size= 3309  frame= 104  insts=1237
+  FAR seg207_0406  size=  154  frame=   6  insts=67
+  FAR seg207_055E  size=  148  frame=   0  insts=70
+  FAR seg207_05F2  size=  562  frame=  34  insts=230
+  FAR seg207_0824  size=  294  frame=  18  insts=127
+  FAR seg207_10FA  size=  251  frame=  10  insts=82
+  FAR seg207_1278  size=  307  frame=   6  insts=105
+      seg208_002A  size=  237  frame=  24  insts=104
+      seg208_0117  size=  118  frame=   6  insts=45
+      seg208_019F  size=  266  frame=  22  insts=121
+  FAR seg208_02A9  size= 1982  frame= 174  insts=736
+  FAR seg208_0A67  size=  147  frame=   0  insts=60
+      seg208_0AFA  size=  101  frame=  66  insts=48
+  FAR seg208_0B5F  size=  914  frame= 104  insts=359
+      seg208_0EF1  size=   62  frame=   6  insts=28
+      seg208_0FCE  size=  349  frame= 134  insts=136
+      seg208_114D  size=  116  frame=   8  insts=55
+      seg208_11FC  size=   90  frame=  32  insts=38
+      seg208_1278  size=  110  frame=   8  insts=51
+  FAR seg208_12E6  size=   89  frame=  32  insts=36
+  FAR seg208_133F  size=  114  frame=  12  insts=48
+      seg209_01D3  size=  103  frame=   4  insts=39
+  FAR seg209_0251  size=   51  frame=   2  insts=23
+  FAR seg209_039F  size=   57  frame=   0  insts=16
+  FAR seg209_0437  size=   23  frame=   6  insts=11
+      seg209_04B1  size=   46  frame=   0  insts=29
+  FAR seg209_04DF  size=   45  frame=   2  insts=25
+      seg209_0698  size=   61  frame=   0  insts=37
+  FAR seg209_0704  size=   98  frame=   4  insts=37
+  FAR seg209_07B0  size=   29  frame=   0  insts=15
+  FAR seg209_07CD  size=  119  frame=  14  insts=49
+  FAR seg209_0882  size=   67  frame=   0  insts=36
+      seg209_091D  size=   21  frame=   0  insts=13
+      seg209_0960  size=   24  frame=   0  insts=8
+      seg209_0978  size=   46  frame=   6  insts=23
+  FAR seg209_0A3B  size=   42  frame=   4  insts=22
+  FAR seg209_0A65  size=   36  frame=   2  insts=20
+  FAR seg209_0A89  size=  455  frame=  22  insts=180
+  FAR seg209_0C7E  size=  225  frame=  16  insts=94
+  FAR seg209_0D81  size=   37  frame=   4  insts=18
+  FAR seg209_0DB1  size=   54  frame=   4  insts=29
+  FAR seg209_10D5  size=  109  frame=  26  insts=52
+      seg209_1142  size=   12  frame=  44  insts=7
+  FAR seg209_114E  size=  151  frame=  44  insts=72
+  FAR seg209_11E5  size=   47  frame=   4  insts=29
+  FAR seg209_1214  size=   43  frame=   4  insts=26
+  FAR seg209_123F  size=   84  frame=   6  insts=36
+  FAR seg209_1293  size=   38  frame=   2  insts=20
+  FAR seg209_12B9  size=   44  frame=   0  insts=20
+  FAR seg209_12E5  size=   93  frame=   0  insts=45
+  FAR seg209_138B  size=   46  frame=   4  insts=19
+  FAR seg210_0000  size=  350  frame=   4  insts=131
+  FAR seg210_018C  size=  545  frame=  16  insts=197
+  FAR seg210_0466  size= 1520  frame= 134  insts=523
+  FAR seg210_0A56  size=  380  frame=  88  insts=141
+  FAR seg210_0BD2  size= 1061  frame=  88  insts=399
+  FAR seg211_0310  size=  187  frame=  14  insts=79
+  FAR seg211_057E  size=   73  frame=   0  insts=24
+  FAR seg211_08FA  size=   69  frame=   0  insts=23
+  FAR seg211_0AB4  size=  195  frame=   4  insts=76
+  FAR seg212_0000  size= 1045  frame=  18  insts=371
+  FAR seg212_0732  size=  162  frame=  10  insts=64
+  FAR seg212_07D4  size=   96  frame=   6  insts=44
+  FAR seg212_0834  size=  246  frame=  18  insts=91
+  FAR seg212_092A  size=  246  frame=  18  insts=91
+  FAR seg212_0A20  size=  145  frame=   0  insts=59
+  FAR seg212_0DF2  size=  140  frame=   8  insts=65
+  FAR seg212_0E7E  size=  317  frame= 112  insts=121
+  FAR seg213_0000  size=   60  frame=  16  insts=27
+  FAR seg213_003C  size=   72  frame=  16  insts=34
+  FAR seg213_0084  size=   84  frame=   4  insts=44
+  FAR seg213_00D8  size=  108  frame=   4  insts=52
+  FAR seg213_0144  size=   62  frame=  16  insts=29
+  FAR seg213_019C  size=  117  frame=   4  insts=50
+  FAR seg213_0254  size=   86  frame=  20  insts=33
+  FAR seg213_02AA  size=  101  frame=  10  insts=49
+  FAR seg213_0C68  size=  325  frame=   6  insts=117
+  FAR seg213_1026  size=   46  frame=  16  insts=20
+  FAR seg213_1054  size=  117  frame=  16  insts=46
+  FAR seg213_1362  size=  456  frame=   6  insts=153
+  FAR seg214_0000  size=  391  frame=  10  insts=145
+  FAR seg214_0C3C  size=   94  frame=   4  insts=43
+  FAR seg214_0C9A  size=   75  frame=   0  insts=30
+  FAR seg214_0E68  size=  374  frame=  26  insts=147
+  FAR seg214_1104  size=  170  frame=  12  insts=67
+  FAR seg214_11AE  size=  127  frame=   4  insts=53
+      seg214_1250  size=  106  frame=   8  insts=47
+      seg214_12DC  size=   92  frame= 144  insts=42
+  FAR seg215_0000  size=  227  frame=   8  insts=87
+  FAR seg215_02AC  size=  208  frame=   0  insts=70
+  FAR seg215_0526  size=  291  frame=  20  insts=108
+  FAR seg215_15BC  size=  226  frame=  16  insts=102
+  FAR seg216_01F0  size=  173  frame=  12  insts=79
+  FAR seg216_02F4  size=  123  frame=   4  insts=62
+  FAR seg216_0C10  size=  955  frame=  42  insts=430
+  FAR seg216_1752  size=  157  frame=   0  insts=68
+  FAR seg217_0000  size=   25  frame=   8  insts=13
+  FAR seg217_00A6  size=   38  frame=   8  insts=19
+  FAR seg217_0562  size=   67  frame=   4  insts=33
+  FAR seg217_05C8  size=   87  frame=  10  insts=38
+  FAR seg217_0996  size=  593  frame=  14  insts=225
+  FAR seg217_0CBE  size=  204  frame=   4  insts=77
+  FAR seg217_0E5A  size=   84  frame=   4  insts=39
+  FAR seg217_0EAE  size=  144  frame=   8  insts=61
+  FAR seg217_0F3E  size=  302  frame=  16  insts=115
+  FAR seg217_106C  size=  457  frame=  32  insts=179
+  FAR seg217_12DC  size=  225  frame=   4  insts=84
+  FAR seg218_0000  size= 1186  frame=  46  insts=448
+  FAR seg218_04A2  size=  121  frame=  12  insts=59
+  FAR seg218_0C1C  size=   82  frame=   4  insts=39
+  FAR seg218_0C6E  size=  967  frame= 580  insts=330
+  FAR seg218_12DA  size=  539  frame=  26  insts=192
+  FAR seg218_156C  size=   87  frame=   8  insts=37
+  FAR seg218_17F6  size=  209  frame=  14  insts=89
+  FAR seg219_00DA  size=  326  frame=  20  insts=115
+  FAR seg219_0220  size=  221  frame=  18  insts=81
+  FAR seg219_0B34  size=  666  frame=  40  insts=237
+  FAR seg219_0DCE  size=  836  frame=  26  insts=325
+  FAR seg219_122C  size=  136  frame=   0  insts=57
+  FAR seg219_12B4  size=  211  frame=  34  insts=89
+  FAR seg219_1656  size=  261  frame=   6  insts=106
+  FAR seg220_001E  size= 1314  frame=  34  insts=468
+      seg220_0574  size=   69  frame=   4  insts=34
+  FAR seg220_0916  size=  284  frame= 838  insts=92
+  FAR seg220_0B2C  size=  449  frame= 184  insts=160
+  FAR seg220_0FAE  size=  189  frame=   4  insts=72
+  FAR seg220_165A  size=  589  frame= 188  insts=205
+  FAR seg220_1B0C  size= 1307  frame=  34  insts=466
+  FAR seg220_203A  size=   98  frame=   4  insts=45
+  FAR seg220_209C  size=  980  frame= 178  insts=344
+  FAR seg221_0000  size=   77  frame=   4  insts=39
+  FAR seg221_0144  size=  841  frame= 116  insts=320
+  FAR seg221_04F0  size=  157  frame=   8  insts=59
+  FAR seg221_0696  size=  211  frame=   0  insts=81
+  FAR seg221_0C50  size=  224  frame=   0  insts=85
+  FAR seg221_0D30  size=  730  frame= 106  insts=285
+  FAR seg221_100A  size=  332  frame=  84  insts=135
+  FAR seg221_1156  size=   79  frame=   4  insts=40
+  FAR seg222_0000  size=  773  frame=  14  insts=285
+  FAR seg222_04D8  size=  554  frame=  24  insts=225
+  FAR seg222_0702  size=  276  frame=  14  insts=114
+  FAR seg222_0816  size=  146  frame=   4  insts=73
+  FAR seg222_0A4E  size=  299  frame=  18  insts=132
+  FAR seg222_143A  size=  155  frame=   6  insts=70
+  FAR seg222_17AE  size=  789  frame=  48  insts=290
+  FAR seg222_1B7C  size=  353  frame=  14  insts=136
+  FAR seg222_20D0  size=  100  frame= 260  insts=46
+  FAR seg222_2134  size=  118  frame=   6  insts=52
+  FAR seg222_21D2  size=  371  frame=  24  insts=159
+  FAR seg223_0000  size=  239  frame=   6  insts=96
+  FAR seg223_068E  size= 1408  frame=  54  insts=491
+  FAR seg223_0C0E  size=  195  frame=  14  insts=85
+  FAR seg223_0D68  size=  215  frame=  14  insts=84
+  FAR seg223_0EDA  size=  579  frame=  32  insts=217
+  FAR seg223_11E2  size=  340  frame=  20  insts=133
+  FAR seg223_1336  size=  282  frame=  14  insts=119
+  FAR seg223_1450  size= 1069  frame=  80  insts=349
+  FAR seg223_1A7E  size=  168  frame=   8  insts=74
+  FAR seg223_1B26  size= 1083  frame=  24  insts=372
+  FAR seg223_2128  size=  577  frame= 890  insts=211
+  FAR seg223_249A  size=  920  frame=  32  insts=327
+  FAR seg223_2832  size=  933  frame=  38  insts=324
+  FAR seg223_327E  size=  323  frame=  16  insts=127
+  FAR seg223_34CE  size=  940  frame=  42  insts=329
+  FAR seg223_3AEC  size= 1658  frame= 126  insts=604
+  FAR seg223_4166  size=   77  frame=   4  insts=32
+  FAR seg224_0000  size=  411  frame=   8  insts=164
+  FAR seg224_01F2  size=   72  frame=   4  insts=33
+  FAR seg224_023A  size=  336  frame=  14  insts=123
+  FAR seg224_038A  size=  277  frame=  16  insts=111
+  FAR seg224_096A  size=  205  frame=   6  insts=90
+  FAR seg224_0C2E  size=  436  frame=  22  insts=193
+  FAR seg224_0DE2  size=  392  frame=  34  insts=158
+  FAR seg224_0F6A  size=  273  frame=  18  insts=124
+  FAR seg224_11A4  size=  146  frame=  12  insts=67
+  FAR seg224_1236  size=  939  frame=  54  insts=367
+  FAR seg224_1A2A  size=  198  frame=  14  insts=82
+  FAR seg224_1AF0  size=  152  frame=  14  insts=64
+  FAR seg224_1B88  size=  135  frame=  10  insts=57
+  FAR seg224_1D26  size=  108  frame=   6  insts=51
+  FAR seg224_1D92  size= 2787  frame= 176  insts=1122
+  FAR seg224_28EE  size=  215  frame=  18  insts=88
+  FAR seg224_2A70  size=   64  frame=   4  insts=34
+  FAR seg224_2AB0  size=   87  frame=   8  insts=44
+  FAR seg224_2B4E  size=  210  frame=  12  insts=75
+  FAR seg224_2C20  size=   80  frame=   8  insts=36
+  FAR seg224_2C8A  size=  412  frame=  24  insts=167
+  FAR seg224_2E26  size=  287  frame=  20  insts=116
+  FAR seg224_2FD6  size=  625  frame=  38  insts=241
+  FAR seg224_32DE  size= 1571  frame= 208  insts=603
+  FAR seg224_3A20  size=  156  frame=  20  insts=66
+  FAR seg224_3ABC  size=  329  frame=  14  insts=148
+  FAR seg224_4166  size=  118  frame=   8  insts=54
+  FAR seg224_41DC  size=   73  frame=   4  insts=35
+  FAR seg225_0000  size=  308  frame= 122  insts=175
+  FAR seg225_0134  size=  474  frame=  60  insts=188
+  FAR seg225_030E  size= 1861  frame=  78  insts=927
+  FAR seg225_0DA4  size= 1968  frame= 124  insts=849
+  FAR seg225_1554  size=  121  frame=  10  insts=58
+  FAR seg225_15DC  size=  716  frame=  64  insts=368
+  FAR seg225_18A8  size=  699  frame=  44  insts=343
+  FAR seg225_1D24  size= 1085  frame=  92  insts=525
+  FAR seg226_0230  size=  178  frame= 716  insts=79
+  FAR seg226_0322  size=   47  frame=   4  insts=24
+  FAR seg226_0436  size=   78  frame=   4  insts=39
+  FAR seg226_04DE  size=  328  frame=  18  insts=147
+  FAR seg226_06FC  size=  130  frame=   8  insts=56
+  FAR seg226_077E  size=  168  frame=  10  insts=70
+  FAR seg226_0830  size=  227  frame= 772  insts=96
+  FAR seg226_0B74  size=  140  frame=   8  insts=52
+  FAR seg226_0C00  size=  129  frame=   8  insts=49
+  FAR seg226_0E2A  size=   89  frame=   8  insts=33
+  FAR seg226_18DE  size=  116  frame=   4  insts=55
+  FAR seg226_1952  size=  206  frame= 274  insts=79
+  FAR seg226_1A20  size=  110  frame=   0  insts=44
+  FAR seg226_1A8E  size=  183  frame=  16  insts=79
+  FAR seg226_1D32  size=  283  frame=  12  insts=109
+      seg226_1EF8  size=   96  frame=   8  insts=43
+  FAR seg226_218C  size=  246  frame=  18  insts=102
+  FAR seg226_2282  size=  509  frame=  58  insts=197
+  FAR seg226_2630  size=   97  frame=   4  insts=40
+  FAR seg226_28D8  size=  108  frame=   0  insts=54
+  FAR seg226_2944  size=  216  frame=   6  insts=77
+  FAR seg226_2A1C  size=   63  frame=   4  insts=28
+      seg226_2AAA  size=  151  frame= 104  insts=68
+  FAR seg226_2D5C  size=  235  frame=  14  insts=93
+  FAR seg226_3132  size=  305  frame= 804  insts=117
+  FAR seg226_329A  size=  367  frame=   4  insts=140
+  FAR seg226_3508  size=   40  frame=   0  insts=15
+  FAR seg226_3530  size=  128  frame=   4  insts=51
+  FAR seg226_35B0  size=  169  frame= 712  insts=67
+  FAR seg226_368C  size=  307  frame=  32  insts=131
+  FAR seg226_3818  size=  132  frame=   6  insts=50
+  FAR seg226_389C  size=   79  frame=   0  insts=35
+  FAR seg226_39C4  size=  214  frame=  14  insts=80
+  FAR seg226_3A9A  size=  272  frame=  14  insts=102
+  FAR seg226_3BAA  size=  258  frame=  10  insts=97
+  FAR seg226_3CAC  size=   92  frame=  16  insts=42
+  FAR seg226_3D12  size=   70  frame=   0  insts=34
+  FAR seg226_3E88  size=  272  frame=  28  insts=112
+  FAR seg226_3F98  size=  121  frame=  16  insts=54
+  FAR seg226_4092  size=  138  frame=   8  insts=64
+  FAR seg226_4138  size=  132  frame=   8  insts=63
+  FAR seg226_41BC  size=  130  frame=  10  insts=60
+  FAR seg226_423E  size=  329  frame=  28  insts=147
+      seg226_45FA  size=  115  frame=   8  insts=53
+      seg226_4690  size=  294  frame=  14  insts=130
+  FAR seg226_47B6  size=  129  frame=  12  insts=55
+  FAR seg226_493A  size=  149  frame=   6  insts=49
+  FAR seg227_0000  size=  207  frame=   4  insts=88
+  FAR seg227_017A  size=   71  frame=   0  insts=37
+  FAR seg227_0256  size=  255  frame=  22  insts=114
+  FAR seg227_05CE  size=  102  frame=   4  insts=49
+      seg227_08CC  size=  216  frame=  14  insts=86
+  FAR seg227_09A4  size=  181  frame=   4  insts=67
+      seg227_0A7C  size=  468  frame=  20  insts=175
+  FAR seg227_0C64  size=  163  frame=  10  insts=63
+  FAR seg227_0E76  size=  405  frame=  32  insts=164
+  FAR seg227_1044  size=  187  frame=  24  insts=78
+  FAR seg227_113C  size=   53  frame=   4  insts=25
+  FAR seg227_119A  size=  230  frame=   6  insts=89
+  FAR seg227_12B2  size=  130  frame=   4  insts=61
+  FAR seg227_136A  size=   89  frame=   0  insts=41
+  FAR seg227_1596  size=  121  frame=   4  insts=52
+  FAR seg227_1640  size=  850  frame=  48  insts=321
+  FAR seg227_1992  size=  210  frame=   4  insts=91
+  FAR seg227_1A64  size=  200  frame=   4  insts=88
+  FAR seg227_1C0E  size=  384  frame= 812  insts=156
+  FAR seg227_1D8E  size=  103  frame=   4  insts=43
+  FAR seg227_209A  size=  486  frame=   8  insts=202
+  FAR seg227_2318  size=  104  frame=   6  insts=52
+  FAR seg227_2380  size=  107  frame=   4  insts=47
+  FAR seg227_2426  size=  218  frame=  22  insts=98
+  FAR seg227_28C8  size=  654  frame=  26  insts=306
+  FAR seg227_2B56  size=   64  frame=   0  insts=30
+  FAR seg227_2B96  size=  180  frame=   6  insts=73
+  FAR seg227_2C4A  size=   69  frame=   0  insts=31
+  FAR seg227_2DE8  size=  237  frame=  16  insts=94
+  FAR seg227_3008  size=  183  frame=  10  insts=79
+  FAR seg227_310C  size=  438  frame=  32  insts=181
+      seg227_32E4  size=  201  frame= 210  insts=91
+      seg227_33D0  size=  193  frame= 210  insts=87
+  FAR seg227_3506  size=  141  frame=   4  insts=55
+  FAR seg227_3668  size=  172  frame=  14  insts=71
+  FAR seg227_3714  size=  176  frame=   8  insts=74
+  FAR seg227_37C4  size=  253  frame=   8  insts=99
+  FAR seg227_39F2  size=  163  frame=   8  insts=67
+  FAR seg227_3BCA  size=   85  frame=   4  insts=37
+  FAR seg227_3CDE  size=   36  frame=   0  insts=18
+  FAR seg227_3D02  size=   36  frame=   0  insts=18
+  FAR seg227_3D26  size=  213  frame=   6  insts=67
+  FAR seg227_3E1E  size=   90  frame=   0  insts=46
+  FAR seg227_3E78  size=  463  frame=  10  insts=193
+  FAR seg227_4102  size=  404  frame=  10  insts=170
+  FAR seg227_42A4  size=   78  frame=   4  insts=36
+  FAR seg227_42F2  size=   92  frame=   4  insts=43
+  FAR seg227_434E  size=  138  frame=   8  insts=61
+  FAR seg227_43D8  size=  113  frame=   6  insts=51
+  FAR seg227_4600  size=   72  frame=   0  insts=34
+  FAR seg227_4648  size=   83  frame=   0  insts=40
+  FAR seg227_46CE  size=  105  frame=   0  insts=50
+  FAR seg227_4924  size=  254  frame=   8  insts=114
+      seg227_4A44  size=  363  frame=  14  insts=154
+      seg227_4BD2  size=  162  frame=   8  insts=70
+  FAR seg227_4C74  size=   50  frame=   0  insts=27
+  FAR seg227_4CA6  size=   59  frame=   0  insts=33
+  FAR seg227_5514  size=   95  frame=   0  insts=38
+  FAR seg227_5726  size=  220  frame=  12  insts=82
+  FAR seg227_5802  size=  179  frame=   6  insts=70
+  FAR seg227_5922  size=  414  frame= 102  insts=163
+  FAR seg227_5DBE  size=  362  frame=  78  insts=123
+  FAR seg227_5F28  size=  172  frame=  26  insts=71
+  FAR seg227_6246  size=  255  frame=  16  insts=98
+  FAR seg228_0000  size=  155  frame=   0  insts=73
+  FAR seg228_0202  size=  153  frame=   4  insts=74
+  FAR seg228_04C0  size=  286  frame=  18  insts=119
+  FAR seg228_05DE  size=  289  frame=  20  insts=117
+  FAR seg228_0C80  size=  289  frame=  16  insts=109
+  FAR seg228_0E7E  size=  364  frame=  18  insts=138
+  FAR seg228_0FEA  size=  411  frame=  24  insts=166
+  FAR seg228_153C  size=  194  frame=   0  insts=70
+  FAR seg228_15FE  size=  643  frame=  74  insts=294
+  FAR seg228_1890  size=  434  frame=  28  insts=162
+  FAR seg228_1EBC  size=  692  frame=  52  insts=323
+  FAR seg228_2170  size=  130  frame=   0  insts=59
+  FAR seg228_224E  size=  197  frame=  18  insts=87
+  FAR seg228_3150  size=   78  frame=   0  insts=42
+  FAR seg228_319E  size=   83  frame=   6  insts=39
+  FAR seg228_33AE  size=   89  frame=   8  insts=40
+  FAR seg228_36B4  size=   74  frame=   4  insts=35
+  FAR seg228_36FE  size= 1420  frame=  76  insts=783
+  FAR seg228_3C8A  size=  328  frame=  50  insts=174
+  FAR seg228_3DD2  size=  535  frame= 188  insts=218
+  FAR seg228_46C0  size=  623  frame= 106  insts=251
+  FAR seg228_4BB0  size=  930  frame=   4  insts=381
+  FAR seg228_4F64  size= 1867  frame=   6  insts=759
+  FAR seg228_56C2  size= 1767  frame=   6  insts=729
+  FAR seg228_5DBC  size=  797  frame=   6  insts=322
+  FAR seg228_61C6  size=  685  frame=   6  insts=277
+  FAR seg229_009A  size=   86  frame=  10  insts=48
+  FAR seg229_00F0  size=  143  frame=   0  insts=81
+  FAR seg229_0302  size=  109  frame=   8  insts=56
+  FAR seg229_0590  size=  191  frame=  10  insts=86
+  FAR seg229_0800  size= 1874  frame=7818  insts=978
+  FAR seg229_0F52  size=  296  frame=  16  insts=120
+  FAR seg229_107A  size=  522  frame=  18  insts=193
+  FAR seg229_138E  size=  314  frame= 150  insts=122
+  FAR seg229_14C8  size=  665  frame=  42  insts=286
+  FAR seg229_186A  size=  276  frame=  12  insts=110
+  FAR seg229_197E  size=  261  frame=  10  insts=99
+  FAR seg229_1AEC  size=  573  frame=  44  insts=230
+  FAR seg229_1F92  size=  645  frame=5232  insts=247
+  FAR seg229_276E  size=  140  frame=  12  insts=58
+  FAR seg229_27FA  size=  261  frame=   0  insts=110
+  FAR seg229_2CC2  size=  238  frame=   8  insts=105
+  FAR seg229_2DB0  size=  454  frame=  50  insts=246
+  FAR seg229_2F76  size=  670  frame=  54  insts=364
+  FAR seg229_3214  size=  346  frame= 218  insts=145
+  FAR seg229_336E  size=  231  frame=  30  insts=113
+  FAR seg229_42F0  size=  781  frame=  50  insts=312
+  FAR seg229_4A32  size=  323  frame=  10  insts=137
+  FAR seg229_4EBE  size= 3253  frame= 228  insts=1466
+      seg229_6CE2  size= 1405  frame= 340  insts=581
+  FAR seg230_0000  size=  121  frame=  10  insts=65
+  FAR seg230_01E2  size=  936  frame=  66  insts=523
+  FAR seg230_058A  size=  603  frame=  60  insts=309
+  FAR seg230_094E  size=  878  frame=  82  insts=423
+  FAR seg230_0D4E  size=  328  frame=  38  insts=153
+  FAR seg230_0E96  size=  645  frame=  50  insts=305
+  FAR seg230_1888  size=  213  frame=   6  insts=86
+  FAR seg230_1AFC  size=   68  frame=   8  insts=36
+  FAR seg230_1B40  size=   68  frame=   8  insts=36
+  FAR seg230_1B84  size=   68  frame=   8  insts=36
+  FAR seg230_1BC8  size= 1737  frame=  90  insts=710
+  FAR seg230_2348  size=  470  frame=  32  insts=249
+  FAR seg230_251E  size= 1162  frame=  36  insts=574
+  FAR seg230_29A8  size=  266  frame=  40  insts=155
+  FAR seg230_2AB2  size= 1621  frame=  88  insts=880
+  FAR seg230_37C8  size= 2653  frame= 320  insts=1325
+  FAR seg230_44A0  size= 1361  frame= 112  insts=723
+  FAR seg230_5DF4  size=  227  frame=  32  insts=116
+  FAR seg230_63A6  size=  345  frame=  28  insts=162
+  FAR seg230_7A84  size= 1124  frame=  62  insts=584
+  FAR seg230_7EE8  size=  987  frame=  46  insts=480
+  FAR seg230_B102  size=  762  frame=  94  insts=346
+  FAR seg230_B3FC  size=  101  frame=   4  insts=46
+  FAR seg230_B5B4  size=  286  frame=  22  insts=112
+  FAR seg230_B6D2  size=   41  frame=   4  insts=17
+  FAR seg230_B86E  size=  145  frame=   4  insts=52
+  FAR seg230_B90A  size=  564  frame=  44  insts=221
+  FAR seg231_008C  size=   93  frame=   0  insts=48
+  FAR seg231_01F8  size=   85  frame=  24  insts=53
+  FAR seg231_02A8  size=   97  frame=  48  insts=55
+  FAR seg231_040C  size=   74  frame=   8  insts=39
+  FAR seg231_0456  size=   74  frame=   8  insts=39
+  FAR seg231_04A0  size=   74  frame=   8  insts=39
+  FAR seg231_04EA  size=  100  frame=  18  insts=55
+  FAR seg231_054E  size=  100  frame=  18  insts=55
+  FAR seg231_05B2  size=   62  frame=  12  insts=32
+  FAR seg231_05F0  size=   85  frame=  16  insts=42
+  FAR seg231_099A  size=  176  frame=  58  insts=90
+  FAR seg231_0A4A  size=  484  frame=  44  insts=243
+  FAR seg231_0C2E  size=   83  frame=  12  insts=48
+  FAR seg231_0EA2  size=   39  frame=   0  insts=21
+  FAR seg231_0FF2  size=  374  frame=  22  insts=195
+  FAR seg231_1168  size= 2239  frame= 222  insts=995
+  FAR seg231_1A96  size=  152  frame=   4  insts=76
+  FAR seg231_1B2E  size=  620  frame=  20  insts=262
+  FAR seg231_1D9A  size=  603  frame=  12  insts=260
+  FAR seg231_338A  size=  731  frame=  26  insts=354
+  FAR seg231_3A3A  size=  619  frame=  28  insts=286
+  FAR seg231_3CEA  size=   76  frame=   6  insts=36
+  FAR seg231_3D36  size=  747  frame=  66  insts=406
+  FAR seg231_42B0  size=  615  frame=  46  insts=286
+  FAR seg231_4582  size=  159  frame=   6  insts=86
+  FAR seg231_48AA  size=  213  frame=  30  insts=106
+  FAR seg231_4BE2  size=  120  frame=   0  insts=60
+  FAR seg231_4C5A  size=  721  frame= 186  insts=306
+  FAR seg231_5232  size=  649  frame= 144  insts=270
+  FAR seg231_596E  size=  549  frame= 336  insts=256
+  FAR seg231_5EF6  size=  402  frame=  20  insts=153
+  FAR seg231_6088  size=   90  frame=   0  insts=37
+  FAR seg231_60E2  size=  434  frame= 306  insts=178
+  FAR seg231_6294  size=  191  frame=  10  insts=75
+  FAR seg231_64CE  size=  130  frame=  18  insts=63
+  FAR seg231_6550  size=   59  frame=   8  insts=30
+  FAR seg231_68CC  size=   70  frame=   6  insts=38
+  FAR seg231_6912  size=  411  frame=  14  insts=186
+  FAR seg231_6D32  size=  146  frame=  24  insts=76
+  FAR seg231_6DC4  size=  415  frame=  54  insts=222
+  FAR seg231_7210  size=   58  frame=   0  insts=26
+  FAR seg231_724A  size=  389  frame=  42  insts=210
+  FAR seg231_75D4  size=  536  frame=  32  insts=248
+  FAR seg231_77EC  size=  686  frame=  14  insts=335
+  FAR seg231_7FA4  size=  269  frame=  10  insts=142
+  FAR seg231_812A  size=  410  frame=  30  insts=217
+  FAR seg231_82C4  size= 1079  frame= 106  insts=588
+  FAR seg231_8AC6  size=  331  frame=   4  insts=156
+  FAR seg231_9028  size= 2655  frame= 100  insts=1523
+  FAR seg231_A12C  size= 1665  frame=1358  insts=787
+  FAR seg231_AE4E  size=  206  frame=   6  insts=89
+  FAR seg231_AF1C  size= 5603  frame=7806  insts=2255
+  FAR seg231_C78E  size=  342  frame=   8  insts=114
+  FAR seg231_CA30  size= 1004  frame=  80  insts=450

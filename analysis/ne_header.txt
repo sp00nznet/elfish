@@ -1,0 +1,145 @@
+=== NE Executable: game/ELFISH/ELFISH.EXE ===
+Linker: 5.0
+Target OS: OS/2
+Flags: 0x000A (GLOBALHEAP | PROTMODE)
+Entry: seg 122:0000
+Stack: seg 1, SP=0x8000
+Alignment shift: 4 (sector size: 16)
+
+Segments: 231 total (121 CODE, 110 DATA)
+Code size: 508,409 bytes
+Relocations: 25,394 total
+
+Imported modules: TSXLIB
+
+Resident names (1):
+  0: elfish
+
+=== Code Segments ===
+  Seg 111: 0x000152C0  size=0x0023 (    35), 5 relocs
+  Seg 112: 0x00015310  size=0x20B5 (  8373), 35 relocs
+  Seg 113: 0x000174F0  size=0x0028 (    40), 1 relocs
+  Seg 114: 0x00017530  size=0x002A (    42), 2 relocs
+  Seg 115: 0x00017570  size=0x003D (    61), 1 relocs
+  Seg 116: 0x000175C0  size=0x0046 (    70)
+  Seg 117: 0x00017610  size=0x004E (    78), 1 relocs
+  Seg 118: 0x00017670  size=0x0067 (   103), 1 relocs
+  Seg 119: 0x000176F0  size=0x0071 (   113), 4 relocs
+  Seg 120: 0x00017790  size=0x007C (   124), 1 relocs
+  Seg 121: 0x00017820  size=0x0081 (   129), 4 relocs
+  Seg 122: 0x000178D0  size=0x0083 (   131), 5 relocs
+  Seg 123: 0x00017980  size=0x0087 (   135), 2 relocs
+  Seg 124: 0x00017A20  size=0x0090 (   144), 15 relocs
+  Seg 125: 0x00017B30  size=0x0098 (   152), 5 relocs
+  Seg 126: 0x00017C00  size=0x00A2 (   162), 4 relocs
+  Seg 127: 0x00017CD0  size=0x00B0 (   176), 4 relocs
+  Seg 128: 0x00017DB0  size=0x00BF (   191), 5 relocs
+  Seg 129: 0x00017EA0  size=0x00C8 (   200), 3 relocs
+  Seg 130: 0x00017F90  size=0x00D0 (   208), 4 relocs
+  Seg 131: 0x00018090  size=0x00F1 (   241)
+  Seg 132: 0x00018190  size=0x00F8 (   248), 2 relocs
+  Seg 133: 0x000182A0  size=0x00FF (   255), 4 relocs
+  Seg 134: 0x000183D0  size=0x0109 (   265), 1 relocs
+  Seg 135: 0x000184F0  size=0x0109 (   265), 7 relocs
+  Seg 136: 0x00018640  size=0x012C (   300), 6 relocs
+  Seg 137: 0x000187A0  size=0x015C (   348), 7 relocs
+  Seg 138: 0x00018940  size=0x0162 (   354), 9 relocs
+  Seg 139: 0x00018AF0  size=0x017F (   383), 14 relocs
+  Seg 140: 0x00018CF0  size=0x01C7 (   455), 17 relocs
+  Seg 141: 0x00018F50  size=0x01C7 (   455), 5 relocs
+  Seg 142: 0x00019150  size=0x0206 (   518), 11 relocs
+  Seg 143: 0x000193C0  size=0x0220 (   544), 11 relocs
+  Seg 144: 0x00019640  size=0x0234 (   564), 7 relocs
+  Seg 145: 0x000198B0  size=0x026D (   621), 18 relocs
+  Seg 146: 0x00019BC0  size=0x0287 (   647), 13 relocs
+  Seg 147: 0x00019EC0  size=0x02BF (   703), 5 relocs
+  Seg 148: 0x0001A1B0  size=0x02D7 (   727), 6 relocs
+  Seg 149: 0x0001A4C0  size=0x02FF (   767), 30 relocs
+  Seg 150: 0x0001A8C0  size=0x0309 (   777), 16 relocs
+  Seg 151: 0x0001AC50  size=0x0316 (   790), 9 relocs
+  Seg 152: 0x0001AFC0  size=0x034B (   843), 20 relocs
+  Seg 153: 0x0001B3B0  size=0x034E (   846)
+  Seg 154: 0x0001B700  size=0x039A (   922), 21 relocs
+  Seg 155: 0x0001BB50  size=0x03B4 (   948), 3 relocs
+  Seg 156: 0x0001BF20  size=0x03E7 (   999), 27 relocs
+  Seg 157: 0x0001C3F0  size=0x0435 (  1077), 27 relocs
+  Seg 158: 0x0001C910  size=0x0472 (  1138), 29 relocs
+  Seg 159: 0x0001CE70  size=0x04C0 (  1216), 21 relocs
+  Seg 160: 0x0001D3E0  size=0x04D6 (  1238), 147 relocs
+  Seg 161: 0x0001DD60  size=0x0515 (  1301), 27 relocs
+  Seg 162: 0x0001E360  size=0x053D (  1341), 42 relocs
+  Seg 163: 0x0001EA00  size=0x0565 (  1381), 33 relocs
+  Seg 164: 0x0001F080  size=0x0582 (  1410), 20 relocs
+  Seg 165: 0x0001F6B0  size=0x058C (  1420), 25 relocs
+  Seg 166: 0x0001FD10  size=0x05DA (  1498), 209 relocs
+  Seg 167: 0x00020980  size=0x0600 (  1536), 8 relocs
+  Seg 168: 0x00020FD0  size=0x0615 (  1557), 6 relocs
+  Seg 169: 0x00021620  size=0x0657 (  1623), 12 relocs
+  Seg 170: 0x00021CE0  size=0x06BE (  1726), 33 relocs
+  Seg 171: 0x000224B0  size=0x06E3 (  1763), 36 relocs
+  Seg 172: 0x00022CC0  size=0x070A (  1802), 7 relocs
+  Seg 173: 0x00023410  size=0x0740 (  1856), 20 relocs
+  Seg 174: 0x00023C00  size=0x0762 (  1890), 14 relocs
+  Seg 175: 0x000243E0  size=0x0790 (  1936), 44 relocs
+  Seg 176: 0x00024CE0  size=0x07C6 (  1990), 5 relocs
+  Seg 177: 0x000254E0  size=0x0801 (  2049), 6 relocs
+  Seg 178: 0x00025D20  size=0x0911 (  2321), 8 relocs
+  Seg 179: 0x00026680  size=0x093F (  2367), 32 relocs
+  Seg 180: 0x000270D0  size=0x094A (  2378), 63 relocs
+  Seg 181: 0x00027C20  size=0x095A (  2394), 66 relocs
+  Seg 182: 0x00028790  size=0x095E (  2398), 48 relocs
+  Seg 183: 0x00029280  size=0x096A (  2410), 23 relocs
+  Seg 184: 0x00029CB0  size=0x096E (  2414), 8 relocs
+  Seg 185: 0x0002A670  size=0x096E (  2414), 25 relocs
+  Seg 186: 0x0002B0B0  size=0x09BE (  2494), 39 relocs
+  Seg 187: 0x0002BBB0  size=0x0A22 (  2594), 615 relocs
+  Seg 188: 0x0002D910  size=0x0A41 (  2625), 31 relocs
+  Seg 189: 0x0002E450  size=0x0A8A (  2698), 21 relocs
+  Seg 190: 0x0002EF90  size=0x0ABC (  2748), 55 relocs
+  Seg 191: 0x0002FC10  size=0x0AD6 (  2774), 51 relocs
+  Seg 192: 0x00030890  size=0x0B14 (  2836), 122 relocs
+  Seg 193: 0x00031780  size=0x0B62 (  2914), 77 relocs
+  Seg 194: 0x00032550  size=0x0B69 (  2921), 10 relocs
+  Seg 195: 0x00033110  size=0x0BC4 (  3012), 14 relocs
+  Seg 196: 0x00033D50  size=0x0BC8 (  3016), 62 relocs
+  Seg 197: 0x00034B10  size=0x0CED (  3309), 21 relocs
+  Seg 198: 0x000358B0  size=0x0D4E (  3406), 70 relocs
+  Seg 199: 0x00036840  size=0x0D88 (  3464), 76 relocs
+  Seg 200: 0x00037830  size=0x0E21 (  3617), 35 relocs
+  Seg 201: 0x00038770  size=0x0E59 (  3673), 108 relocs
+  Seg 202: 0x00039930  size=0x0E7C (  3708), 76 relocs
+  Seg 203: 0x0003AA10  size=0x0ED8 (  3800), 36 relocs
+  Seg 204: 0x0003BA10  size=0x1058 (  4184), 23 relocs
+  Seg 205: 0x0003CB30  size=0x10EE (  4334), 26 relocs
+  Seg 206: 0x0003DD00  size=0x1162 (  4450), 120 relocs
+  Seg 207: 0x0003F230  size=0x13AB (  5035), 21 relocs
+  Seg 208: 0x00040690  size=0x13B1 (  5041), 20 relocs
+  Seg 209: 0x00041AF0  size=0x13C0 (  5056), 46 relocs
+  Seg 210: 0x00043030  size=0x140F (  5135), 92 relocs
+  Seg 211: 0x00044730  size=0x165E (  5726), 61 relocs
+  Seg 212: 0x00045F80  size=0x169A (  5786), 66 relocs
+  Seg 213: 0x00047830  size=0x169C (  5788), 12 relocs
+  Seg 214: 0x00048F30  size=0x16BF (  5823), 65 relocs
+  Seg 215: 0x0004A800  size=0x16CC (  5836), 19 relocs
+  Seg 216: 0x0004BF70  size=0x17EF (  6127), 9 relocs
+  Seg 217: 0x0004D7B0  size=0x180D (  6157), 15 relocs
+  Seg 218: 0x0004F040  size=0x18C7 (  6343), 98 relocs
+  Seg 219: 0x00050C20  size=0x1B90 (  7056), 30 relocs
+  Seg 220: 0x000528B0  size=0x2470 (  9328), 136 relocs
+  Seg 221: 0x00055170  size=0x24C0 (  9408), 121 relocs
+  Seg 222: 0x00057A00  size=0x2612 (  9746), 56 relocs
+  Seg 223: 0x0005A1E0  size=0x4210 ( 16912), 254 relocs
+  Seg 224: 0x0005EBF0  size=0x4264 ( 16996), 117 relocs
+  Seg 225: 0x00063200  size=0x47E6 ( 18406), 2409 relocs
+  Seg 226: 0x0006C540  size=0x49EA ( 18922), 86 relocs
+  Seg 227: 0x000711E0  size=0x64B1 ( 25777), 222 relocs
+  Seg 228: 0x00077D90  size=0x6913 ( 26899), 1030 relocs
+  Seg 229: 0x000806E0  size=0x86DD ( 34525), 2890 relocs
+  Seg 230: 0x0008E820  size=0xBB48 ( 47944), 7449 relocs
+  Seg 231: 0x000A8C40  size=0xCE1C ( 52764), 6695 relocs
+
+=== Relocation Summary ===
+  Internal references: 4022
+  Import references: 21372
+  Code segments referenced by relocations: 117
+  Data segments referenced by relocations: 109
