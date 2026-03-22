@@ -2,7 +2,7 @@
 
 Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Windows 11.
 
-## Project Status: Full Lift Complete — Building Toward Compilation
+## Project Status: Lifted & Build System Ready
 
 ### What's Done
 - Game files fully extracted (`game/ELFISH/` directory tree)
@@ -10,9 +10,11 @@ Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Window
 - Built complete NE analysis and lifting toolchain (6 tools)
 - Full disassembly: **772 functions**, **214,516 instructions** across 121 code segments
 - Program architecture mapped — core math engine, UI/logic, system layer identified
-- **All 121 code segments lifted to C** — **1,544 functions**, **111,273 lines** in `src/`
-- Runtime header `cpu.h` with x87 FPU state, memory access, and flag helpers
-- Compilation verified on non-FPU segments (seg 131 sprite blitting)
+- **All 121 code segments lifted to C** — **1,544 functions**, **110,174 lines** in `src/`
+- **3,299 FPU memory operations** properly resolved with `seg:off` addresses
+- Runtime headers: `cpu.h` (CPU + FPU state), `segments.h` (1,501 cross-segment prototypes)
+- CMake build system with TSXLIB runtime stubs
+- Compilation verified on non-FPU segments
 
 ### Executable Analysis
 
@@ -73,17 +75,25 @@ Only 12 of 121 code segments directly call TSXLIB — the system layer is thin a
 | Metric | Value |
 |--------|-------|
 | Source files | 121 (one per code segment) |
-| Functions | 1,544 |
-| Lines of C | 111,273 |
+| Functions | 1,544 (1,501 with prototypes) |
+| Lines of C | 110,174 |
+| FPU memory ops resolved | 3,299 / 3,401 (97%) |
 | Lifting errors | 0 |
 
+### Building
+
+```bash
+mkdir build && cd build
+cmake ..
+cmake --build .
+```
+
 ### What's Next
-1. Add cross-segment forward declarations (`extern` prototypes)
-2. Resolve FPU memory operands (address computation from ModR/M)
-3. Create build system (CMake/Makefile)
-4. Implement TSXLIB runtime stubs (memory, file I/O, DOS compat)
-5. Get first successful full compilation
-6. Add SDL2 platform layer for Windows 11 target
+1. Fix remaining compile errors across all 121 source files
+2. Implement TSXLIB runtime stubs (memory alloc, file I/O, DOS compat)
+3. Extract and load NE data segments into flat memory
+4. Add SDL2 platform layer for video output and input
+5. Test execution starting from entry point (seg 122 → seg 209)
 
 ### Other Executables
 
@@ -103,14 +113,24 @@ Only 12 of 121 code segments directly call TSXLIB — the system layer is thin a
 - Custom DLL system for sound/video drivers (`XX_MDR*.DLL`, `*.MIR`)
 - Install layout: `ARTWORK\`, `FISH\`, `SYSTEM\`, `AQUARIUM\`
 
-## Project Tools
-- `tools/ne_parse.py` — NE executable format parser
-- `tools/ne_decode.py` — NE-aware 16-bit disassembler with x87 FPU decoding
-- `tools/fpu_decode.py` — Full x87 FPU instruction decoder
-- `tools/tsxlib.py` — TSXLIB ordinal-to-C function mapping
-- `tools/ne_xref.py` — Cross-reference and call graph builder
-- `tools/ne_lift.py` — NE-aware x86-to-C lifter with FPU support
-- `analysis/` — Generated analysis outputs
+## Project Structure
+```
+src/           — 121 lifted C source files (one per code segment)
+runtime/
+  cpu.h        — CPU + FPU state, memory access, flags, condition codes
+  segments.h   — 1,501 cross-segment function prototypes (auto-generated)
+  main.c       — Entry point (placeholder)
+  tsxlib_stubs.c — TSXLIB runtime stub implementations
+tools/
+  ne_parse.py  — NE executable format parser
+  ne_decode.py — NE-aware disassembler with x87 FPU decoding
+  ne_lift.py   — NE-aware x86-to-C lifter with FPU support
+  fpu_decode.py — Full x87 FPU instruction decoder
+  tsxlib.py    — TSXLIB ordinal-to-C function mapping
+  ne_xref.py   — Cross-reference and call graph builder
+analysis/      — Generated analysis outputs
+CMakeLists.txt — Build system
+```
 
 ## Toolchain
 Uses [pcrecomp](https://github.com/sp00nznet/pcrecomp) as the base 16-bit recompilation pipeline, extended with NE format support:
