@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from decode16 import Decoder, Instruction, OpType, Operand
 from ne_parse import parse_ne, NEHeader, Segment, Relocation
+from fpu_decode import decode_fpu, format_fpu
 
 
 @dataclass
@@ -148,6 +149,31 @@ def disassemble_segment(seg: Segment, ne: NEHeader, show_relocs: bool = True) ->
     reloc_map = build_reloc_map(seg, ne)
     decoder = Decoder(seg.data, base_offset=seg.file_offset)
     instructions = decoder.decode_all()
+
+    # Post-process: enhance FPU instructions with proper mnemonics
+    for inst in instructions:
+        if inst.mnemonic.startswith('esc_') or inst.mnemonic.startswith('fpu_'):
+            # Find the FPU opcode in raw bytes (skip any segment override prefix)
+            raw = inst.raw
+            skip = 0
+            if raw[0] in (0x26, 0x2E, 0x36, 0x3E):  # ES/CS/SS/DS override
+                skip = 1
+            if skip < len(raw) - 1 and 0xD8 <= raw[skip] <= 0xDF:
+                opcode = raw[skip]
+                modrm = raw[skip + 1]
+                mod = (modrm >> 6) & 3
+                reg = (modrm >> 3) & 7
+                rm = modrm & 7
+                # Build memory operand string from the decoded instruction's op1
+                seg_prefix = {0x26: 'es:', 0x2E: 'cs:', 0x36: 'ss:', 0x3E: 'ds:'}.get(raw[0], '') if skip else ''
+                mem_str = repr(inst.op1) if inst.op1 else ''
+                if seg_prefix and mem_str:
+                    mem_str = seg_prefix + mem_str
+                fpu = decode_fpu(opcode, modrm, mod, reg, rm, mem_str)
+                inst.mnemonic = format_fpu(fpu)
+                inst.op1 = None
+                inst.op2 = None
+
     functions = detect_functions(seg, instructions)
 
     return instructions, functions, reloc_map
