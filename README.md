@@ -2,14 +2,21 @@
 
 Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Windows 11.
 
-## Project Status: NE Executable Analysis
+## Project Status: Code Lifting In Progress
 
 ### What's Done
 - Game files fully extracted (`game/ELFISH/` directory tree)
 - Main executable (`ELFISH.EXE`) identified as **NE (New Executable)** format
-- Built custom NE parser (`tools/ne_parse.py`) — segments, relocations, entries, imports
-- Built NE-aware disassembler (`tools/ne_decode.py`) wrapping pcrecomp's decode16
-- Full disassembly pass complete: **772 functions**, **214,516 instructions** across 121 code segments
+- Built complete NE analysis and lifting toolchain:
+  - `ne_parse.py` — NE format parser (segments, relocations, entries, imports)
+  - `ne_decode.py` — NE-aware disassembler with x87 FPU decoding
+  - `fpu_decode.py` — Full x87 instruction decoder (all ESC opcodes)
+  - `tsxlib.py` — TSXLIB ordinal-to-C mapping (33 runtime API functions)
+  - `ne_xref.py` — Cross-reference and call graph analysis
+  - `ne_lift.py` — NE-aware x86-to-C lifter with FPU and relocation support
+- Full disassembly pass: **772 functions**, **214,516 instructions** across 121 code segments
+- Program architecture mapped — core math engine, UI/logic, system layer identified
+- First functions successfully lifted to C (sprite blitting, fish math)
 
 ### Executable Analysis
 
@@ -22,15 +29,55 @@ Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Window
 | Functions detected | 772 (697 far) |
 | Instructions | 214,516 |
 | Relocations | 25,394 (4,022 internal, 21,372 imports) |
-| Runtime | TSXLIB (AnimaTek's protected-mode DOS runtime) |
+| Runtime | TSXLIB v5.10 (AnimaTek's protected-mode DOS runtime) |
 | TSXLIB ordinals used | 33 unique (21K+ call sites) |
-| FPU usage | Heavy — ordinals 22-24 are FPU emulation trampolines |
 
-### Key Findings
-- **NE format, not MZ** — El-Fish uses a segmented NE executable with a 22KB TSXLIB MZ stub as the protected-mode loader. This differs from Civ's MZ+overlay approach and required building a new toolchain.
-- **TSXLIB runtime** — AnimaTek's proprietary DOS extender providing memory management, file I/O, and FPU emulation. 33 API functions used via import-by-ordinal relocations.
-- **Heavy floating-point math** — The largest code segments are dominated by FPU operations (fish physics, evolution, rendering). TSXLIB provides FPU emulation for 386 systems without a 387 coprocessor. These translate directly to C `double` operations.
-- **Largest function** — `seg231_AF1C` at 5.6KB with a 7.8KB stack frame, likely the core fish evolution/genetics algorithm.
+### Program Architecture
+
+Only 12 of 121 code segments directly call TSXLIB — the system layer is thin and well-contained.
+
+**Core Math / Fish Engine** (FPU-heavy, ~175KB):
+| Seg | Size | FPU ops | Role |
+|-----|------|---------|------|
+| 231 | 53KB | 6,580 | Fish evolution/genetics (self-recursive, largest function 5.6KB) |
+| 230 | 48KB | 7,341 | Fish rendering/animation |
+| 229 | 35KB | 2,869 | Physics/movement calculations |
+| 228 | 27KB | 956 | Fish shape generation |
+| 225 | 18KB | 2,371 | Rendering math helper |
+
+**Game Logic / UI** (~78KB):
+| Seg | Size | Role |
+|-----|------|------|
+| 227 | 26KB | Main game logic/UI hub (most cross-segment connections) |
+| 226 | 19KB | UI/display manager |
+| 224 | 17KB | Object/resource manager |
+| 223 | 17KB | Scene/aquarium manager |
+
+**System Layer** (TSXLIB wrappers, ~25KB):
+| Seg | Size | Role |
+|-----|------|------|
+| 166 | 1.5KB | Segment manager |
+| 157 | 1KB | File I/O wrapper |
+| 151 | 790B | Memory management |
+| 211 | 5.7KB | Resource loader |
+| 209 | 5KB | Startup/main entry |
+| 112 | 8.4KB | Low-level runtime |
+
+### TSXLIB Runtime API
+
+99.4% of TSXLIB imports are FPU emulation trampolines (ordinals 22-24). Only 44 actual system calls across these categories:
+- **FPU emulation** (22-24): 21,252 call sites — translates to native C `double` ops
+- **Memory management** (55-68): `malloc`/`free`/`realloc`/`lock` equivalents
+- **File I/O** (36-75): `open`/`read`/`write`/`close`/`seek`
+- **Segment management** (20-31): Protected-mode segment loading
+- **System** (32-49): DOS interrupt dispatch, interrupt handlers, port I/O
+
+### What's Next
+1. Resolve FPU memory operands in the lifter (address computation from ModR/M)
+2. Create runtime headers (`cpu.h`, `fpu.h`) adapted for NE segments
+3. Lift a complete segment end-to-end and compile
+4. Begin systematic lifting from utility segments outward
+5. Build SDL2 platform layer for Windows 11 target
 
 ### Other Executables
 
@@ -43,14 +90,6 @@ Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Window
 | `MCONVERT.EXE` | 64 KB | MZ | Converter utility |
 | `XX_MDR*.DLL` | 11-18 KB | Custom | Sound/video drivers |
 
-### What's Next
-1. Map TSXLIB ordinals to C runtime function signatures
-2. Build cross-reference graph (call graph between segments)
-3. Improve function boundary detection for non-standard prologues
-4. Begin lifting x86 functions to C, starting with utilities
-5. Create build system and TSXLIB runtime stubs
-6. Target SDL2 platform layer for Windows 11
-
 ## Game Technical Details
 - 16-bit DOS, protected mode via TSXLIB, requires 386+, 4MB RAM
 - VGA (376×348) and SVGA (640×400) via VESA 1.2
@@ -60,15 +99,19 @@ Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Window
 
 ## Project Tools
 - `tools/ne_parse.py` — NE executable format parser
-- `tools/ne_decode.py` — NE-aware 16-bit disassembler
-- `analysis/` — Generated analysis outputs (function lists, header dumps)
+- `tools/ne_decode.py` — NE-aware 16-bit disassembler with x87 FPU decoding
+- `tools/fpu_decode.py` — Full x87 FPU instruction decoder
+- `tools/tsxlib.py` — TSXLIB ordinal-to-C function mapping
+- `tools/ne_xref.py` — Cross-reference and call graph builder
+- `tools/ne_lift.py` — NE-aware x86-to-C lifter with FPU support
+- `analysis/` — Generated analysis outputs
 
 ## Toolchain
 Uses [pcrecomp](https://github.com/sp00nznet/pcrecomp) as the base 16-bit recompilation pipeline, extended with NE format support:
 - `decode16.py` — 16-bit x86 instruction decoder (pcrecomp)
-- `ne_parse.py` / `ne_decode.py` — NE format extensions (this project)
-- `lift16.py` — x86-to-C lifter (pcrecomp, to be adapted for NE)
-- `recomp16/` — Runtime library (pcrecomp)
+- `lift16.py` — Base x86-to-C lifter (pcrecomp)
+- `ne_*.py` / `fpu_decode.py` / `tsxlib.py` — NE format extensions (this project)
+- `recomp16/` — Runtime library (pcrecomp, to be adapted)
 
 ## Related
 - [pcrecomp tools](https://github.com/sp00nznet/pcrecomp) — Static recompilation toolbox
