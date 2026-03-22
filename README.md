@@ -2,21 +2,17 @@
 
 Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Windows 11.
 
-## Project Status: Code Lifting In Progress
+## Project Status: Full Lift Complete — Building Toward Compilation
 
 ### What's Done
 - Game files fully extracted (`game/ELFISH/` directory tree)
 - Main executable (`ELFISH.EXE`) identified as **NE (New Executable)** format
-- Built complete NE analysis and lifting toolchain:
-  - `ne_parse.py` — NE format parser (segments, relocations, entries, imports)
-  - `ne_decode.py` — NE-aware disassembler with x87 FPU decoding
-  - `fpu_decode.py` — Full x87 instruction decoder (all ESC opcodes)
-  - `tsxlib.py` — TSXLIB ordinal-to-C mapping (33 runtime API functions)
-  - `ne_xref.py` — Cross-reference and call graph analysis
-  - `ne_lift.py` — NE-aware x86-to-C lifter with FPU and relocation support
-- Full disassembly pass: **772 functions**, **214,516 instructions** across 121 code segments
+- Built complete NE analysis and lifting toolchain (6 tools)
+- Full disassembly: **772 functions**, **214,516 instructions** across 121 code segments
 - Program architecture mapped — core math engine, UI/logic, system layer identified
-- First functions successfully lifted to C (sprite blitting, fish math)
+- **All 121 code segments lifted to C** — **1,544 functions**, **111,273 lines** in `src/`
+- Runtime header `cpu.h` with x87 FPU state, memory access, and flag helpers
+- Compilation verified on non-FPU segments (seg 131 sprite blitting)
 
 ### Executable Analysis
 
@@ -72,12 +68,22 @@ Only 12 of 121 code segments directly call TSXLIB — the system layer is thin a
 - **Segment management** (20-31): Protected-mode segment loading
 - **System** (32-49): DOS interrupt dispatch, interrupt handlers, port I/O
 
+### Lifted Code Stats
+
+| Metric | Value |
+|--------|-------|
+| Source files | 121 (one per code segment) |
+| Functions | 1,544 |
+| Lines of C | 111,273 |
+| Lifting errors | 0 |
+
 ### What's Next
-1. Resolve FPU memory operands in the lifter (address computation from ModR/M)
-2. Create runtime headers (`cpu.h`, `fpu.h`) adapted for NE segments
-3. Lift a complete segment end-to-end and compile
-4. Begin systematic lifting from utility segments outward
-5. Build SDL2 platform layer for Windows 11 target
+1. Add cross-segment forward declarations (`extern` prototypes)
+2. Resolve FPU memory operands (address computation from ModR/M)
+3. Create build system (CMake/Makefile)
+4. Implement TSXLIB runtime stubs (memory, file I/O, DOS compat)
+5. Get first successful full compilation
+6. Add SDL2 platform layer for Windows 11 target
 
 ### Other Executables
 
