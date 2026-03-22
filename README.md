@@ -2,7 +2,7 @@
 
 Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Windows 11.
 
-## Project Status: Lifted & Build System Ready
+## Project Status: Lift Complete, Fixing Call Resolution
 
 ### What's Done
 - Game files fully extracted (`game/ELFISH/` directory tree)
@@ -15,6 +15,16 @@ Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Window
 - Runtime headers: `cpu.h` (CPU + FPU state), `segments.h` (1,501 cross-segment prototypes)
 - CMake build system with TSXLIB runtime stubs
 - Compilation verified on non-FPU segments
+
+### Current Issues (Blocking Compilation)
+| Issue | Count | Root Cause |
+|-------|-------|------------|
+| Unresolved far calls | 2,391 | NE relocation chaining not followed — parser only records the head of each chain, missing all subsequent fixup locations |
+| Indirect far calls | 195 | `call far [bp-N]` — function pointer calls through the stack |
+| Data bytes in code | 705 | Data tables embedded between functions, decoded as instructions |
+| Out-of-function jumps | 140 | Function boundary detection missed some cases |
+
+**Root cause analysis:** NE relocations use a chained linked list. Each relocation record stores one offset (the head), and at that offset in the segment data, the bytes contain a pointer to the next location needing the same fixup, continuing until `0xFFFF` (end of chain). The current `ne_parse.py` only records the head offset, so ~60% of fixup locations are invisible to the lifter. Fix: walk each relocation chain through the segment data and record all offsets.
 
 ### Executable Analysis
 
@@ -89,11 +99,13 @@ cmake --build .
 ```
 
 ### What's Next
-1. Fix remaining compile errors across all 121 source files
-2. Implement TSXLIB runtime stubs (memory alloc, file I/O, DOS compat)
-3. Extract and load NE data segments into flat memory
-4. Add SDL2 platform layer for video output and input
-5. Test execution starting from entry point (seg 122 → seg 209)
+1. **Fix relocation chaining** in `ne_parse.py` — walk linked lists through segment data to capture all fixup offsets (~2,391 unresolved far calls)
+2. **Re-lift all segments** with fixed relocations
+3. Handle indirect far calls (195), data-in-code (705), and boundary misses (140)
+4. Implement TSXLIB runtime stubs (memory alloc, file I/O, DOS compat)
+5. Extract and load NE data segments into flat memory
+6. Add SDL2 platform layer for video output and input
+7. Test execution starting from entry point (seg 122 → seg 209)
 
 ### Other Executables
 
