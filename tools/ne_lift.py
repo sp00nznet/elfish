@@ -184,27 +184,27 @@ class NELifter(Lifter):
 
         # --- FPU Arithmetic ---
         elif op == 'fadd':
-            self._lift_fpu_arith('+', operand_str, orig)
+            self._lift_fpu_arith(inst, '+', operand_str, orig)
         elif op == 'faddp':
             self._lift_fpu_arith_pop('+', operand_str, orig)
         elif op == 'fsub':
-            self._lift_fpu_arith('-', operand_str, orig)
+            self._lift_fpu_arith(inst, '-', operand_str, orig)
         elif op == 'fsubp':
             self._lift_fpu_arith_pop('-', operand_str, orig)
         elif op == 'fsubr':
-            self._lift_fpu_arith_r('-', operand_str, orig)
+            self._lift_fpu_arith_r(inst, '-', operand_str, orig)
         elif op == 'fsubrp':
             self._lift_fpu_arith_r_pop('-', operand_str, orig)
         elif op == 'fmul':
-            self._lift_fpu_arith('*', operand_str, orig)
+            self._lift_fpu_arith(inst, '*', operand_str, orig)
         elif op == 'fmulp':
             self._lift_fpu_arith_pop('*', operand_str, orig)
         elif op == 'fdiv':
-            self._lift_fpu_arith('/', operand_str, orig)
+            self._lift_fpu_arith(inst, '/', operand_str, orig)
         elif op == 'fdivp':
             self._lift_fpu_arith_pop('/', operand_str, orig)
         elif op == 'fdivr':
-            self._lift_fpu_arith_r('/', operand_str, orig)
+            self._lift_fpu_arith_r(inst, '/', operand_str, orig)
         elif op == 'fdivrp':
             self._lift_fpu_arith_r_pop('/', operand_str, orig)
 
@@ -349,7 +349,7 @@ class NELifter(Lifter):
         else:
             self._emit(f'/* FPU TODO: {orig} */', orig)
 
-    def _lift_fpu_arith(self, op: str, operand_str: str, orig: str):
+    def _lift_fpu_arith(self, inst, op: str, operand_str: str, orig: str):
         """Lift FPU arithmetic: fadd/fsub/fmul/fdiv."""
         if 'st(0), st(' in operand_str:
             i = self._parse_st(operand_str.split('st(0), ')[1])
@@ -358,7 +358,7 @@ class NELifter(Lifter):
             i = self._parse_st(operand_str)
             self._emit(f'cpu->st[{i}] = cpu->st[{i}] {op} cpu->st[0];', orig)
         elif operand_str:
-            mem = self._fpu_mem_read(None, operand_str)
+            mem = self._fpu_mem_read(inst, operand_str)
             self._emit(f'cpu->st[0] = cpu->st[0] {op} {mem};', orig)
         else:
             self._emit(f'cpu->st[0] = cpu->st[0] {op} cpu->st[1];', orig)
@@ -371,13 +371,13 @@ class NELifter(Lifter):
         else:
             self._emit(f'cpu->st[1] = cpu->st[1] {op} cpu->st[0]; fpu_pop(cpu);', orig)
 
-    def _lift_fpu_arith_r(self, op: str, operand_str: str, orig: str):
+    def _lift_fpu_arith_r(self, inst, op: str, operand_str: str, orig: str):
         """Lift FPU reverse arithmetic: fsubr/fdivr."""
         if 'st(0), st(' in operand_str:
             i = self._parse_st(operand_str.split('st(0), ')[1])
             self._emit(f'cpu->st[0] = cpu->st[{i}] {op} cpu->st[0];', orig)
         elif operand_str:
-            mem = self._fpu_mem_read(None, operand_str)
+            mem = self._fpu_mem_read(inst, operand_str)
             self._emit(f'cpu->st[0] = {mem} {op} cpu->st[0];', orig)
         else:
             self._emit(f'cpu->st[0] = cpu->st[1] {op} cpu->st[0];', orig)
@@ -396,23 +396,50 @@ class NELifter(Lifter):
         m = re.search(r'st\((\d+)\)', operand_str)
         return int(m.group(1)) if m else 0
 
+    def _fpu_mem_expr(self, inst, operand_str: str) -> tuple:
+        """Get (seg_expr, off_expr) for FPU memory operand.
+        Uses inst.op1 if available (preserved from ModR/M decode), otherwise falls back."""
+        if inst and inst.op1 and inst.op1.type in (OpType.MEM, OpType.MOFFS):
+            seg, off = _mem_addr(inst.op1)
+            return seg, off
+        # Fallback: can't resolve, emit a comment
+        return 'cpu->ds', f'0 /* TODO: {operand_str} */'
+
     def _fpu_mem_read(self, inst, operand_str: str) -> str:
         """Generate C expression to read FPU memory operand as double."""
-        # For now, use a generic memory read helper
-        # TODO: resolve actual memory address from instruction operands
-        return f'fpu_read_real(cpu, /* {operand_str} */)'
+        seg, off = self._fpu_mem_expr(inst, operand_str)
+        if 'qword' in operand_str:
+            return f'fpu_read_f64(cpu, {seg}, {off})'
+        elif 'tword' in operand_str:
+            return f'fpu_read_f64(cpu, {seg}, {off}) /* tword approx */'
+        else:  # dword
+            return f'fpu_read_f32(cpu, {seg}, {off})'
 
     def _fpu_mem_write(self, inst, operand_str: str, value: str) -> str:
         """Generate C statement to write FPU value to memory."""
-        return f'fpu_write_real(cpu, /* {operand_str} */, {value});'
+        seg, off = self._fpu_mem_expr(inst, operand_str)
+        if 'qword' in operand_str:
+            return f'fpu_write_f64(cpu, {seg}, {off}, {value});'
+        elif 'tword' in operand_str:
+            return f'fpu_write_f64(cpu, {seg}, {off}, {value}); /* tword approx */'
+        else:  # dword
+            return f'fpu_write_f32(cpu, {seg}, {off}, {value});'
 
     def _fpu_mem_read_int(self, inst, operand_str: str) -> str:
         """Generate C expression to read FPU integer memory operand."""
-        return f'fpu_read_int(cpu, /* {operand_str} */)'
+        seg, off = self._fpu_mem_expr(inst, operand_str)
+        if 'dword' in operand_str:
+            return f'fpu_read_i32(cpu, {seg}, {off})'
+        else:  # word
+            return f'fpu_read_i16(cpu, {seg}, {off})'
 
     def _fpu_mem_write_int(self, inst, operand_str: str, value: str) -> str:
         """Generate C statement to write integer to FPU memory."""
-        return f'fpu_write_int(cpu, /* {operand_str} */, {value});'
+        seg, off = self._fpu_mem_expr(inst, operand_str)
+        if 'dword' in operand_str:
+            return f'fpu_write_i32(cpu, {seg}, {off}, {value});'
+        else:  # word
+            return f'fpu_write_i16(cpu, {seg}, {off}, {value});'
 
 
 def lift_segment(ne: NEHeader, seg_num: int, func_offset: int = -1):
@@ -432,14 +459,7 @@ def lift_segment(ne: NEHeader, seg_num: int, func_offset: int = -1):
     print(f'/* Segment {seg_num} - {seg.actual_size} bytes, {len(functions)} functions */')
     print(f'/* Auto-generated by ne_lift.py - El-Fish Recomp */')
     print()
-    print('#include "cpu.h"')
-    print('#include "fpu.h"')
-    print('#include <math.h>')
-    print()
-
-    # Forward declarations
-    for f in functions:
-        print(f'void {f.label}(CPU *cpu);')
+    print('#include "segments.h"')
     print()
 
     # Lift each function
