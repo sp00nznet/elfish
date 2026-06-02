@@ -38,8 +38,8 @@ int main(int argc, char *argv[])
     CPU cpu;
     cpu_init(&cpu);
 
-    /* Image + generous slack for offsets that run past a segment region. */
-    uint32_t total = ELFISH_IMAGE_SIZE + 0x20000u;
+    /* Image + a heap for dynamic TSXLIB allocations (selectors past the image). */
+    uint32_t total = ELFISH_IMAGE_SIZE + (128u << 20);  /* +128 MB heap */
     if (!cpu_alloc_mem(&cpu, total)) {
         fprintf(stderr, "Failed to allocate %u bytes\n", total);
         return 1;

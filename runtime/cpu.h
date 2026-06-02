@@ -86,6 +86,14 @@ typedef struct CPU {
     uint8_t *mem;
     uint32_t mem_size;
 
+    /* Selector -> flat base table (65536 entries). Segments 1..NUM_SEG come
+     * from the static image layout; dynamically allocated selectors (TSXLIB
+     * memory alloc) are filled in at runtime. */
+    uint32_t *sel_base;
+    uint32_t  heap_next;   /* bump allocator cursor (flat offset) */
+    uint32_t  heap_end;    /* end of usable memory */
+    uint16_t  next_sel;    /* next dynamic selector to hand out */
+
     /* Halt flag */
     int halted;
 } CPU;
@@ -93,39 +101,31 @@ typedef struct CPU {
 /* ── Memory access ─────────────────────────────────────────── */
 
 /*
- * El-Fish uses protected-mode segments via TSXLIB. In the recomp,
- * segment selectors map to flat memory offsets via a segment table.
- * For now, we use real-mode-style seg<<4+off addressing as a
- * placeholder until the segment table is fully reconstructed.
- */
-
-/*
  * Protected-mode selector translation. The lifter normalizes every relocated
- * selector to its NE segment index (SEG_n == n), and gen_image.py places each
- * segment at SEG_SEGMENT_BASE[n] in the flat image. Selectors outside the NE
- * segment range (raw/hardcoded values like 0xF6, TSXLIB descriptors) resolve
- * to an isolated guard region so they fault loudly rather than corrupt data.
+ * selector to its NE segment index (SEG_n == n); gen_image.py places each
+ * segment at SEG_SEGMENT_BASE[n] in the flat image, copied into cpu->sel_base
+ * at startup. Dynamically allocated selectors (TSXLIB memory alloc) get fresh
+ * entries in sel_base. Unmapped selectors point at an isolated guard region.
  */
-static inline uint32_t seg_off(uint16_t seg, uint16_t off) {
-    uint32_t base = (seg <= ELFISH_NUM_SEG) ? SEG_SEGMENT_BASE[seg] : ELFISH_GUARD_BASE;
-    return base + off;
+static inline uint32_t seg_off(CPU *cpu, uint16_t seg, uint16_t off) {
+    return cpu->sel_base[seg] + off;
 }
 
 static inline uint8_t mem_read8(CPU *cpu, uint16_t seg, uint16_t off) {
-    return cpu->mem[seg_off(seg, off)];
+    return cpu->mem[seg_off(cpu, seg, off)];
 }
 
 static inline void mem_write8(CPU *cpu, uint16_t seg, uint16_t off, uint8_t val) {
-    cpu->mem[seg_off(seg, off)] = val;
+    cpu->mem[seg_off(cpu, seg, off)] = val;
 }
 
 static inline uint16_t mem_read16(CPU *cpu, uint16_t seg, uint16_t off) {
-    uint32_t addr = seg_off(seg, off);
+    uint32_t addr = seg_off(cpu, seg, off);
     return (uint16_t)cpu->mem[addr] | ((uint16_t)cpu->mem[addr + 1] << 8);
 }
 
 static inline void mem_write16(CPU *cpu, uint16_t seg, uint16_t off, uint16_t val) {
-    uint32_t addr = seg_off(seg, off);
+    uint32_t addr = seg_off(cpu, seg, off);
     cpu->mem[addr] = (uint8_t)(val & 0xFF);
     cpu->mem[addr + 1] = (uint8_t)(val >> 8);
 }
@@ -363,12 +363,40 @@ static inline void cpu_init(CPU *cpu) {
 static inline int cpu_alloc_mem(CPU *cpu, uint32_t size) {
     cpu->mem = (uint8_t *)calloc(1, size);
     cpu->mem_size = size;
-    return cpu->mem != NULL;
+    cpu->sel_base = (uint32_t *)malloc(65536u * sizeof(uint32_t));
+    if (!cpu->mem || !cpu->sel_base) return 0;
+    /* Default every selector to the guard region, then map the static image
+     * segments (1..NUM_SEG) to their flat bases. */
+    for (uint32_t s = 0; s < 65536u; s++)
+        cpu->sel_base[s] = ELFISH_GUARD_BASE;
+    for (int s = 0; s <= ELFISH_NUM_SEG; s++)
+        cpu->sel_base[s] = SEG_SEGMENT_BASE[s];
+    /* Dynamic heap lives past the loaded image; selectors start well above the
+     * NE range to avoid colliding with raw/hardcoded selectors. */
+    cpu->heap_next = (ELFISH_IMAGE_SIZE + 0xFu) & ~0xFu;
+    cpu->heap_end = size;
+    cpu->next_sel = 0x4000;
+    return 1;
+}
+
+/* Allocate `bytes` from the flat heap and bind a fresh selector to it.
+ * Returns the selector (0 on out-of-memory). The region is already zeroed. */
+static inline uint16_t cpu_alloc_selector(CPU *cpu, uint32_t bytes) {
+    uint32_t base = (cpu->heap_next + 0xFu) & ~0xFu;
+    if (bytes == 0) bytes = 16;
+    if (base + bytes > cpu->heap_end || cpu->next_sel == 0)
+        return 0;
+    cpu->heap_next = base + bytes;
+    uint16_t sel = cpu->next_sel++;
+    cpu->sel_base[sel] = base;
+    return sel;
 }
 
 static inline void cpu_free(CPU *cpu) {
     free(cpu->mem);
+    free(cpu->sel_base);
     cpu->mem = NULL;
+    cpu->sel_base = NULL;
 }
 
 /* ── Port I/O stubs ────────────────────────────────────────── */
