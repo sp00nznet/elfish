@@ -108,6 +108,18 @@ class NELifter(Lifter):
                 self._emit(f'/* unresolved far call {orig} */', orig)
             return
 
+        # --- Indirect far call/jmp through memory (function pointer dispatch) ---
+        if m in ('call far', 'jmp far') and op1 and op1.type == OpType.MEM:
+            seg_e, off_e = _mem_addr(op1)
+            read = (f'uint16_t _o = mem_read16(cpu, {seg_e}, {off_e}); '
+                    f'uint16_t _s = mem_read16(cpu, {seg_e}, (uint16_t)({off_e} + 2));')
+            if m == 'call far':
+                self._emit(f'{{ {read} push16(cpu, cpu->cs); push16(cpu, 0); '
+                           f'dispatch_far(cpu, _s, _o); }}', orig)
+            else:  # jmp far -> tail dispatch
+                self._emit(f'{{ {read} dispatch_far(cpu, _s, _o); return; }}', orig)
+            return
+
         # --- Far jumps (resolve via relocation -> tail call) ---
         if m == 'jmp' and op1 and op1.type == OpType.FAR:
             func_name = self._resolve_far_call(inst)

@@ -10,6 +10,9 @@
 
 #include "cpu.h"
 
+/* ---- Indirect far-call dispatcher (function pointers) ---- */
+void dispatch_far(CPU *cpu, uint16_t seg, uint16_t off);
+
 /* ---- Software interrupts ---- */
 void dos_int21(CPU *cpu);
 void bios_int10(CPU *cpu);
