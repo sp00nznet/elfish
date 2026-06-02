@@ -22,6 +22,8 @@ target_compile_options(elfish_segments PRIVATE
 add_library(elfish_runtime STATIC runtime/tsxlib_stubs.c)
 target_include_directories(elfish_runtime PRIVATE runtime)
 
-# Placeholder main for testing compilation
+# Runtime entry point
 add_executable(elfish_test runtime/main.c)
+target_compile_definitions(elfish_test PRIVATE
+    ELFISH_IMAGE_PATH="${CMAKE_SOURCE_DIR}/build_data/mem_image.bin")
 target_link_libraries(elfish_test elfish_segments elfish_runtime m)

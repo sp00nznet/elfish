@@ -2,10 +2,12 @@
 
 Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Windows 11.
 
-## Project Status: Compiles & Links Clean
+## Project Status: Executes Startup Code
 
-The full lifted codebase now **compiles and links with zero undefined symbols** and the
-resulting executable runs. Focus has shifted from "make it build" to "make it correct."
+The full lifted codebase **compiles, links (zero undefined symbols), and runs**: it loads a
+flat memory image, calls the NE entry point, flows across segments
+(`seg122 → seg209_0196 → seg209_0306`), issues a DOS `INT 21h` call, and returns without
+faulting. Focus is now on **runtime services** so startup can proceed into the game.
 
 ### What's Done
 - Game files fully extracted (`game/ELFISH/` directory tree)
@@ -27,11 +29,15 @@ resulting executable runs. Focus has shifted from "make it build" to "make it co
 ### Remaining Work (correctness, prioritized)
 | Issue | Count | Status / Plan |
 |-------|-------|---------------|
-| Real-mode `seg<<4` addressing | — | **Next.** Placeholder for a protected-mode NE; needs a selector→flat-base table |
-| Data segments not loaded | 110 | DATA segments not yet placed in flat memory; entry point (seg122→seg209) not wired |
+| Runtime services are no-ops | — | **Next.** Startup reaches DOS `INT 21h AH=51h` then early-exits; implement TSXLIB mem/file + DOS/BIOS services so init proceeds |
 | Dropped opcodes (`rcr`/`rcl` + others) | ~300 | Emitted as TODO comments; implement in `lift16.py` |
-| Indirect far calls | 195 | `call far [bp-N]` function-pointer dispatch, unhandled |
+| Indirect far calls/jumps | ~200 | `call/jmp far [mem]` function-pointer dispatch, unhandled |
 | Unaligned NO-OP stubs (residual) | 26 | Bogus far-call targets past segment end / IDA-classified data — no-op is correct |
+
+**Memory model:** selectors are normalized to NE segment indices; `gen_image.py` builds a flat
+image (`build_data/mem_image.bin`) placing each segment at `SEG_SEGMENT_BASE[n]` with all 12,320
+internal relocations applied. `seg_off()` translates selector→base at runtime; unmapped selectors
+hit an isolated guard region.
 
 **Relocation chaining (fixed):** NE relocations are a chained linked list — each record stores
 only the head offset, and the pre-relocation word at each fixup location points to the next

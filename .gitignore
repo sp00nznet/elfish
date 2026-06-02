@@ -11,6 +11,9 @@ build/
 *.obj
 *.exe
 
+# Generated flat memory image (contains game data; regen via tools/gen_image.py)
+build_data/
+
 # IDE
 .vscode/
 .idea/

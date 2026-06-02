@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include "mem_layout.h"
 
 /* ── Flag bits ─────────────────────────────────────────────── */
 
@@ -91,8 +92,16 @@ typedef struct CPU {
  * placeholder until the segment table is fully reconstructed.
  */
 
+/*
+ * Protected-mode selector translation. The lifter normalizes every relocated
+ * selector to its NE segment index (SEG_n == n), and gen_image.py places each
+ * segment at SEG_SEGMENT_BASE[n] in the flat image. Selectors outside the NE
+ * segment range (raw/hardcoded values like 0xF6, TSXLIB descriptors) resolve
+ * to an isolated guard region so they fault loudly rather than corrupt data.
+ */
 static inline uint32_t seg_off(uint16_t seg, uint16_t off) {
-    return ((uint32_t)seg << 4) + off;
+    uint32_t base = (seg <= ELFISH_NUM_SEG) ? SEG_SEGMENT_BASE[seg] : ELFISH_GUARD_BASE;
+    return base + off;
 }
 
 static inline uint8_t mem_read8(CPU *cpu, uint16_t seg, uint16_t off) {

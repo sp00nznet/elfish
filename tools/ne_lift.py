@@ -108,6 +108,16 @@ class NELifter(Lifter):
                 self._emit(f'/* unresolved far call {orig} */', orig)
             return
 
+        # --- Far jumps (resolve via relocation -> tail call) ---
+        if m == 'jmp' and op1 and op1.type == OpType.FAR:
+            func_name = self._resolve_far_call(inst)
+            if func_name and not func_name.startswith('/*'):
+                # Tail call: run the target, then return to our caller.
+                self._emit(f'{func_name}(cpu); return;', orig)
+            else:
+                self._emit(f'/* unresolved far jmp {orig} */', orig)
+            return
+
         # --- Near calls ---
         if m == 'call' and op1 and op1.type in (OpType.REL8, OpType.REL16):
             target = op1.disp
