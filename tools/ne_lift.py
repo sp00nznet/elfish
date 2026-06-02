@@ -15,8 +15,9 @@ import sys
 import os
 from typing import Optional
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'tools', 'tools', 'disasm'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'tools', 'tools', 'lift'))
+_PC = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tools', 'tools'))
+sys.path.insert(0, os.path.join(_PC, 'disasm'))
+sys.path.insert(0, os.path.join(_PC, 'lift'))
 sys.path.insert(0, os.path.dirname(__file__))
 
 from decode16 import Decoder, Instruction, OpType, Operand, REG16_NAMES
@@ -124,7 +125,7 @@ class NELifter(Lifter):
                     r = ann.reloc
                     if (r.flags & 3) == 0:  # Internal
                         self._emit(_write(op1, f'SEG_{r.target_seg}'),
-                                   f'{orig}  /* selector for seg{r.target_seg} */')
+                                   f'{orig} -- selector for seg{r.target_seg}')
                         return
 
         # --- Default: delegate to base lifter ---

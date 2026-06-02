@@ -11,11 +11,12 @@ Usage:
 import sys
 import os
 import struct
+import json
 from dataclasses import dataclass, field
 from typing import Optional
 
 # Add pcrecomp tools to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'tools', 'tools', 'disasm'))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tools', 'tools', 'disasm')))
 sys.path.insert(0, os.path.dirname(__file__))
 
 from decode16 import Decoder, Instruction, OpType, Operand
@@ -74,69 +75,136 @@ def build_reloc_map(seg: Segment, ne: NEHeader) -> dict:
             desc = f"OSFIXUP({r.target_seg},{r.target_off})"
 
         src_name = r.src_name
-        ann = RelocAnnotation(offset=r.offset, reloc=r, target_desc=f"[{src_name}] {desc}")
-        reloc_map[r.offset] = ann
+        full_desc = f"[{src_name}] {desc}"
+
+        # NE relocations are chained: the record stores only the HEAD offset.
+        # At each fixup location the (pre-relocation) WORD holds the offset of
+        # the next location needing the same fixup, terminated by 0xFFFF.
+        # Additive relocations are not chained (the location holds an addend).
+        if r.additive or not seg.data:
+            reloc_map[r.offset] = RelocAnnotation(offset=r.offset, reloc=r,
+                                                  target_desc=full_desc)
+            continue
+
+        off = r.offset
+        visited = set()
+        while off != 0xFFFF and off not in visited and 0 <= off + 1 < len(seg.data):
+            visited.add(off)
+            reloc_map[off] = RelocAnnotation(offset=off, reloc=r, target_desc=full_desc)
+            off = struct.unpack_from('<H', seg.data, off)[0]
 
     return reloc_map
 
 
-def detect_functions(seg: Segment, instructions: list) -> list:
-    """Detect function boundaries using prologue/epilogue patterns."""
-    functions = []
-    current_func = None
+def load_ida_data(ne: NEHeader) -> dict:
+    """Load IDA-exported accurate code structure (analysis/ida_funcs.json) if
+    present. Maps NE segment number (str) -> {functions, heads, code_ranges}.
+    Cached on the NEHeader; returns {} when the file is absent."""
+    cache = getattr(ne, '_ida_data', None)
+    if cache is not None:
+        return cache
+    path = os.environ.get('ELFISH_IDA_JSON') or os.path.join(
+        os.path.dirname(__file__), '..', 'analysis', 'ida_funcs.json')
+    data = {}
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        data = {}
+    ne._ida_data = data
+    return data
 
+
+def collect_internal_code_targets(ne: NEHeader) -> dict:
+    """Map (1-based code seg index) -> set of offsets that are far-call/far-ptr
+    targets from ANY segment's relocations. These are authoritative function
+    entry points. Cached on the NEHeader. Only FAR_PTR(3)/PTR48(11) internal
+    relocations carry a real code offset; SELECTOR(2) loads only set a segment."""
+    cache = getattr(ne, '_internal_code_targets', None)
+    if cache is not None:
+        return cache
+    m = {}
+    for s in ne.segments:
+        for r in s.relocations:
+            if (r.flags & 3) != 0:          # not an internal reference
+                continue
+            if r.src_type not in (3, 11):   # FAR_PTR / PTR48 only
+                continue
+            tseg = r.target_seg
+            if tseg == 0xFF or not (1 <= tseg <= len(ne.segments)):
+                continue
+            if ne.segments[tseg - 1].is_code:
+                m.setdefault(tseg, set()).add(r.target_off)
+    ne._internal_code_targets = m
+    return m
+
+
+def detect_functions(seg: Segment, instructions: list, forced_entries=None) -> list:
+    """Detect function boundaries.
+
+    Entry points are the union of:
+      - prologue sites (push bp / mov bp, sp),
+      - all call targets (near calls within this segment + far-call targets
+        into this segment via relocations),
+      - the first instruction (to capture any leading code).
+    Functions span [entry, next_entry); this guarantees every call target that
+    lands on a real instruction boundary becomes a defined function."""
+    forced_entries = forced_entries or set()
+    if not instructions:
+        return []
+
+    inst_off = [inst.offset - seg.file_offset for inst in instructions]
+    valid = set(inst_off)
+    # offset -> instruction index, for frame-size lookup
+    idx_by_off = {off: i for i, off in enumerate(inst_off)}
+
+    starts = set()
+
+    # Prologue-based starts + near-call targets within this segment
     for i, inst in enumerate(instructions):
-        local_off = inst.offset - seg.file_offset
-
-        # Detect prologue: PUSH BP
+        local_off = inst_off[i]
         if (inst.mnemonic == 'push' and inst.op1 and
                 inst.op1.type == OpType.REG16 and inst.op1.reg == 5):  # BP
-            # Check if next is MOV BP, SP
             if i + 1 < len(instructions):
-                next_inst = instructions[i + 1]
-                if (next_inst.mnemonic == 'mov' and
-                        next_inst.op1 and next_inst.op1.type == OpType.REG16 and next_inst.op1.reg == 5 and
-                        next_inst.op2 and next_inst.op2.type == OpType.REG16 and next_inst.op2.reg == 4):
-                    # Found prologue: push bp / mov bp, sp
-                    if current_func:
-                        current_func.end = local_off
-                        current_func.size = current_func.end - current_func.offset
-                        functions.append(current_func)
+                nxt = instructions[i + 1]
+                if (nxt.mnemonic == 'mov' and
+                        nxt.op1 and nxt.op1.type == OpType.REG16 and nxt.op1.reg == 5 and
+                        nxt.op2 and nxt.op2.type == OpType.REG16 and nxt.op2.reg == 4):
+                    starts.add(local_off)
+        if (inst.mnemonic == 'call' and inst.op1 and
+                inst.op1.type in (OpType.REL8, OpType.REL16)):
+            tgt = inst.op1.disp
+            if tgt in valid:
+                starts.add(tgt)
 
-                    current_func = NEFunction(
-                        seg_num=seg.index,
-                        offset=local_off,
-                        end=0,
-                    )
+    # Far-call targets into this segment (only ones on instruction boundaries)
+    for off in forced_entries:
+        if off in valid:
+            starts.add(off)
 
-                    # Check for SUB SP, N
-                    if i + 2 < len(instructions):
-                        sub_inst = instructions[i + 2]
-                        if (sub_inst.mnemonic == 'sub' and
-                                sub_inst.op1 and sub_inst.op1.type == OpType.REG16 and sub_inst.op1.reg == 4 and
-                                sub_inst.op2 and sub_inst.op2.type in (OpType.IMM8, OpType.IMM16)):
-                            current_func.local_size = sub_inst.op2.disp
+    # Always capture leading code
+    starts.add(inst_off[0])
 
-        # Detect epilogue: RET / RETF
-        if inst.mnemonic in ('ret', 'retf', 'iret'):
-            if current_func:
-                if inst.mnemonic == 'retf':
-                    current_func.is_far = True
-                current_func.inst_count += 1  # Count this one too
-                current_func.end = local_off + inst.length
-                current_func.size = current_func.end - current_func.offset
-                functions.append(current_func)
-                current_func = None
-                continue
-
-        if current_func:
-            current_func.inst_count += 1
-
-    # Handle unterminated function at end of segment
-    if current_func:
-        current_func.end = seg.actual_size
-        current_func.size = current_func.end - current_func.offset
-        functions.append(current_func)
+    starts = sorted(starts)
+    functions = []
+    for si, start in enumerate(starts):
+        end = starts[si + 1] if si + 1 < len(starts) else seg.actual_size
+        func_insts = [instructions[i] for i in range(idx_by_off[start], len(instructions))
+                      if inst_off[i] < end]
+        if not func_insts:
+            continue
+        is_far = any(fi.mnemonic in ('retf', 'iret') for fi in func_insts)
+        func = NEFunction(seg_num=seg.index, offset=start, end=end,
+                          size=end - start, is_far=is_far, inst_count=len(func_insts))
+        # Frame size from SUB SP, N right after prologue
+        si0 = idx_by_off[start]
+        if (si0 + 2 < len(instructions)):
+            sub = instructions[si0 + 2]
+            if (sub.mnemonic == 'sub' and sub.op1 and sub.op1.type == OpType.REG16
+                    and sub.op1.reg == 4 and sub.op2
+                    and sub.op2.type in (OpType.IMM8, OpType.IMM16)):
+                func.local_size = sub.op2.disp
+        functions.append(func)
 
     return functions
 
@@ -148,7 +216,21 @@ def disassemble_segment(seg: Segment, ne: NEHeader, show_relocs: bool = True) ->
 
     reloc_map = build_reloc_map(seg, ne)
     decoder = Decoder(seg.data, base_offset=seg.file_offset)
-    instructions = decoder.decode_all()
+
+    # If IDA exported accurate instruction heads for this segment, decode at
+    # exactly those offsets. This eliminates linear-sweep desync on data-in-code
+    # (every head is a true instruction boundary IDA already verified).
+    seg_ida = load_ida_data(ne).get(str(seg.index))
+    if seg_ida and seg_ida.get('heads'):
+        instructions = []
+        for h in seg_ida['heads']:
+            if 0 <= h < len(seg.data):
+                decoder.pos = h
+                inst = decoder.decode_one()
+                if inst is not None:
+                    instructions.append(inst)
+    else:
+        instructions = decoder.decode_all()
 
     # Post-process: enhance FPU instructions with proper mnemonics
     # The base decoder's ESC handler reads ModR/M to advance position but
@@ -210,7 +292,10 @@ def disassemble_segment(seg: Segment, ne: NEHeader, show_relocs: bool = True) ->
                 inst.op1 = mem_op  # Set to decoded memory operand or None for register ops
                 inst.op2 = None
 
-    functions = detect_functions(seg, instructions)
+    forced_entries = set(collect_internal_code_targets(ne).get(seg.index, set()))
+    if seg_ida and seg_ida.get('functions'):
+        forced_entries.update(seg_ida['functions'])  # authoritative IDA entries
+    functions = detect_functions(seg, instructions, forced_entries)
 
     return instructions, functions, reloc_map
 

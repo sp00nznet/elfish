@@ -3,8 +3,8 @@ project(elfish_recomp C)
 
 set(CMAKE_C_STANDARD 11)
 
-# Gather all lifted source files
-file(GLOB SEGMENT_SOURCES src/seg*.c)
+# Gather all lifted source files (segments + generated unresolved stubs)
+file(GLOB SEGMENT_SOURCES src/*.c)
 
 # Runtime include path
 include_directories(runtime)

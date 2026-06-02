@@ -21,3 +21,12 @@ build/
 # Python
 __pycache__/
 *.pyc
+
+# IDA databases (analysis/ida_funcs.json IS committed as a build input)
+*.i64
+*.idb
+*.id0
+*.id1
+*.id2
+*.nam
+*.til

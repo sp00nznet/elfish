@@ -2,29 +2,41 @@
 
 Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Windows 11.
 
-## Project Status: Lift Complete, Fixing Call Resolution
+## Project Status: Compiles & Links Clean
+
+The full lifted codebase now **compiles and links with zero undefined symbols** and the
+resulting executable runs. Focus has shifted from "make it build" to "make it correct."
 
 ### What's Done
 - Game files fully extracted (`game/ELFISH/` directory tree)
 - Main executable (`ELFISH.EXE`) identified as **NE (New Executable)** format
-- Built complete NE analysis and lifting toolchain (6 tools)
-- Full disassembly: **772 functions**, **214,516 instructions** across 121 code segments
+- Built complete NE analysis and lifting toolchain (8 tools)
 - Program architecture mapped — core math engine, UI/logic, system layer identified
-- **All 121 code segments lifted to C** — **1,544 functions**, **110,174 lines** in `src/`
-- **3,299 FPU memory operations** properly resolved with `seg:off` addresses
-- Runtime headers: `cpu.h` (CPU + FPU state), `segments.h` (1,501 cross-segment prototypes)
-- CMake build system with TSXLIB runtime stubs
-- Compilation verified on non-FPU segments
+- **All 121 code segments lifted to C** — **2,236 functions**, ~**196K lines** in `src/`
+- **Relocation chaining fixed** — far-call resolution went from 4,966 unresolved to **2** (99.96%)
+- **IDA-driven disassembly** — IDA Professional 9.1 (idalib, headless) exports accurate
+  function boundaries + instruction heads (`analysis/ida_funcs.json`); the decoder syncs to
+  these, cutting unaligned NO-OP stubs from **819 → 26** (96.8%)
+- **Cross-segment entry-point seeding** — function detection seeds from prologues + near-call
+  targets + far-call targets + IDA functions, so call destinations become real functions
+- Runtime: `cpu.h` (CPU + FPU state), `runtime_api.h` (interrupt + TSXLIB ordinal decls),
+  `tsxlib_stubs.c` (all 33 ordinals + interrupt handlers stubbed), auto-generated `segments.h`
+- CMake/Ninja build → `libelfish_segments.a` + `libelfish_runtime.a` + `elfish_test.exe`,
+  verified link-clean (whole-archive, 0 undefined symbols)
 
-### Current Issues (Blocking Compilation)
-| Issue | Count | Root Cause |
-|-------|-------|------------|
-| Unresolved far calls | 2,391 | NE relocation chaining not followed — parser only records the head of each chain, missing all subsequent fixup locations |
-| Indirect far calls | 195 | `call far [bp-N]` — function pointer calls through the stack |
-| Data bytes in code | 705 | Data tables embedded between functions, decoded as instructions |
-| Out-of-function jumps | 140 | Function boundary detection missed some cases |
+### Remaining Work (correctness, prioritized)
+| Issue | Count | Status / Plan |
+|-------|-------|---------------|
+| Real-mode `seg<<4` addressing | — | **Next.** Placeholder for a protected-mode NE; needs a selector→flat-base table |
+| Data segments not loaded | 110 | DATA segments not yet placed in flat memory; entry point (seg122→seg209) not wired |
+| Dropped opcodes (`rcr`/`rcl` + others) | ~300 | Emitted as TODO comments; implement in `lift16.py` |
+| Indirect far calls | 195 | `call far [bp-N]` function-pointer dispatch, unhandled |
+| Unaligned NO-OP stubs (residual) | 26 | Bogus far-call targets past segment end / IDA-classified data — no-op is correct |
 
-**Root cause analysis:** NE relocations use a chained linked list. Each relocation record stores one offset (the head), and at that offset in the segment data, the bytes contain a pointer to the next location needing the same fixup, continuing until `0xFFFF` (end of chain). The current `ne_parse.py` only records the head offset, so ~60% of fixup locations are invisible to the lifter. Fix: walk each relocation chain through the segment data and record all offsets.
+**Relocation chaining (fixed):** NE relocations are a chained linked list — each record stores
+only the head offset, and the pre-relocation word at each fixup location points to the next
+location needing the same fixup, until `0xFFFF`. `build_reloc_map` now walks the full chain
+through segment data (non-additive relocations), recovering all fixup sites.
 
 ### Executable Analysis
 
