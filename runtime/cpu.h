@@ -94,6 +94,10 @@ typedef struct CPU {
     uint32_t  heap_end;    /* end of usable memory */
     uint16_t  next_sel;    /* next dynamic selector to hand out */
 
+    /* Emulated BIOS timer tick (0040:006C), advanced on each read so the
+     * game's timer wait/calibration loops make progress. */
+    uint32_t  bios_ticks;
+
     /* Halt flag */
     int halted;
 } CPU;
@@ -120,6 +124,12 @@ static inline void mem_write8(CPU *cpu, uint16_t seg, uint16_t off, uint8_t val)
 }
 
 static inline uint16_t mem_read16(CPU *cpu, uint16_t seg, uint16_t off) {
+    /* Absolute/BIOS-data selector 0xFFFF: emulate the 0040:006C timer tick so
+     * the game's timer wait and speed-calibration loops terminate. */
+    if (seg == 0xFFFF) {
+        if (off == 0x6C) return (uint16_t)(cpu->bios_ticks++);
+        if (off == 0x6E) return (uint16_t)(cpu->bios_ticks >> 16);
+    }
     uint32_t addr = seg_off(cpu, seg, off);
     return (uint16_t)cpu->mem[addr] | ((uint16_t)cpu->mem[addr + 1] << 8);
 }
