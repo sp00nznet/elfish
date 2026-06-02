@@ -21,6 +21,13 @@
 #include <math.h>
 #include "mem_layout.h"
 
+/* ── Function-entry trace (opt-in: compile with -DELFISH_TRACE_FN) ── */
+#ifdef ELFISH_TRACE_FN
+#define TRACE_FN(n) fprintf(stderr, "FN %s\n", (n))
+#else
+#define TRACE_FN(n) ((void)0)
+#endif
+
 /* ── Flag bits ─────────────────────────────────────────────── */
 
 #define FLAG_CF  0x0001

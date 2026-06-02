@@ -27,8 +27,12 @@ void bios_int16(CPU *cpu)  { TRACE("INT16 ah=%02X\n", cpu->ah); (void)cpu; }
 void mouse_int33(CPU *cpu) { TRACE("INT33 ax=%04X\n", cpu->ax); (void)cpu; }
 void int_handler(CPU *cpu, int int_num) { TRACE("INT %02X\n", int_num); (void)cpu; (void)int_num; }
 
-/* ---- TSXLIB ordinals ---- */
-#define TSX_STUB(name) void name(CPU *cpu) { TRACE("%s\n", #name); (void)cpu; }
+/* ---- TSXLIB ordinals ----
+ * These are reached through the far-call convention the lifter emits
+ * (push cs; push 0; <ordinal>(cpu)), so each must clean up the 4-byte far
+ * return address exactly as the real routine's RETF would (cpu->sp += 4).
+ * Omitting this leaks stack and corrupts the caller's saved registers. */
+#define TSX_STUB(name) void name(CPU *cpu) { TRACE("%s\n", #name); cpu->sp += 4; }
 TSX_STUB(tsx_fpu_dispatch)
 TSX_STUB(tsx_fpu_wait)
 TSX_STUB(tsx_fpu_memop)

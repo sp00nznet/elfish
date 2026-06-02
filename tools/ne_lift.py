@@ -483,6 +483,10 @@ def lift_segment(ne: NEHeader, seg_num: int, func_offset: int = -1):
             print(f"/* Function at offset 0x{func_offset:04X} not found */")
             return
 
+    # Map each function start offset to its label, for fall-through handling.
+    off_to_label = {f.offset: f.label for f in functions}
+    TERMINATORS = ('ret', 'retf', 'iret', 'jmp')
+
     for func in target_funcs:
         # Get instructions for this function
         func_insts = [i for i in instructions
@@ -492,6 +496,21 @@ def lift_segment(ne: NEHeader, seg_num: int, func_offset: int = -1):
 
         code = lifter.lift_function(
             func.label, func_insts, seg.file_offset + func.offset, func.is_far)
+        # Inject an entry-trace marker (compiles to nothing without -DELFISH_TRACE_FN)
+        code = code.replace('{\n', '{\n    TRACE_FN("%s");\n' % func.label, 1)
+
+        # Fall-through: if the last instruction is not a control-flow terminator,
+        # execution flows into the next function. Emit that as a tail call so the
+        # control flow isn't lost at the function boundary.
+        last = func_insts[-1]
+        if last.mnemonic not in TERMINATORS:
+            nxt = off_to_label.get(func.end)
+            if nxt and nxt != func.label:
+                close = code.rfind('}')
+                code = (code[:close]
+                        + f'    {nxt}(cpu); return; /* fall-through */\n'
+                        + code[close:])
+
         print(code)
         print()
 
