@@ -80,8 +80,19 @@ TSX_STUB(tsx_file_close)
 TSX_STUB(tsx_int_io)
 TSX_STUB(tsx_set_handler)
 TSX_STUB(tsx_save_context)
-TSX_STUB(tsx_mem_alloc)
-TSX_STUB(tsx_mem_alloc_small)
+/* tsx_mem_alloc / _small: allocate a block sized by AX (paragraphs); return the
+ * selector in AX (0 = failure). At least a full 64K segment is backed so any
+ * in-segment offset is valid. */
+static void tsx_mem_alloc_impl(CPU *cpu) {
+    uint32_t bytes = (uint32_t)cpu->ax * 16u;
+    if (bytes < 0x10000u) bytes = 0x10000u;
+    uint16_t sel = cpu_alloc_selector(cpu, bytes);
+    cpu->ax = sel;
+    if (sel) cpu->flags &= ~FLAG_CF; else cpu->flags |= FLAG_CF;
+    cpu->sp += 4;
+}
+void tsx_mem_alloc(CPU *cpu)       { TRACE("tsx_mem_alloc\n");       tsx_mem_alloc_impl(cpu); }
+void tsx_mem_alloc_small(CPU *cpu) { TRACE("tsx_mem_alloc_small\n"); tsx_mem_alloc_impl(cpu); }
 TSX_STUB(tsx_mem_free)
 TSX_STUB(tsx_file_open)
 TSX_STUB(tsx_mem_realloc)
