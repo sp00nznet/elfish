@@ -161,6 +161,10 @@ void dos_int21(CPU *cpu)
         } else { cpu->flags |= FLAG_CF; cpu->ax = 6; }
         break;
     }
+    case 0x47:  /* get current directory: DL=drive, DS:SI=64-byte buffer */
+        mem_write8(cpu, cpu->ds, cpu->si, 0);  /* report root of game dir */
+        cpu->ax = 0x0100; cpu->flags &= ~FLAG_CF;
+        break;
     case 0x44:  /* IOCTL: AL=0 get device info for handle in BX */
         if (cpu->al == 0) {
             /* handles 0/1/2 are character devices (bit 7 set); files clear it */
