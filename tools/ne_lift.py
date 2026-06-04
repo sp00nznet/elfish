@@ -120,6 +120,37 @@ class NELifter(Lifter):
                 self._emit(f'{{ {read} dispatch_far(cpu, _s, _o); return; }}', orig)
             return
 
+        # --- Near jmp/Jcc to another function in this segment -> tail call ---
+        # (base lifter would drop these as "out of function" comments)
+        _CC = {'jo': 'cc_o', 'jno': 'cc_no', 'jb': 'cc_b', 'jae': 'cc_ae',
+               'je': 'cc_e', 'jne': 'cc_ne', 'jbe': 'cc_be', 'ja': 'cc_a',
+               'js': 'cc_s', 'jns': 'cc_ns', 'jp': 'cc_p', 'jnp': 'cc_np',
+               'jl': 'cc_l', 'jge': 'cc_ge', 'jle': 'cc_le', 'jg': 'cc_g'}
+        if (m == 'jmp' or m in _CC) and op1 and op1.type in (OpType.REL8, OpType.REL16):
+            target = op1.disp
+            if (target not in self.valid_addrs
+                    and target in getattr(self, 'seg_func_offsets', ())):
+                callee = f'seg{self.seg.index:03d}_{target:04X}'
+                if m == 'jmp':
+                    self._emit(f'{callee}(cpu); return;', orig)
+                else:
+                    self._emit(f'if ({_CC[m]}(cpu)) {{ {callee}(cpu); return; }}', orig)
+                return
+
+        # --- loop/jcxz to another function in this segment -> tail call ---
+        if m in ('loop', 'loopz', 'loopnz', 'jcxz') and op1 and op1.type in (OpType.REL8, OpType.REL16):
+            target = op1.disp
+            if (target not in self.valid_addrs
+                    and target in getattr(self, 'seg_func_offsets', ())):
+                callee = f'seg{self.seg.index:03d}_{target:04X}'
+                cond = {'loop': 'cpu->cx != 0',
+                        'loopz': 'cpu->cx != 0 && zf(cpu)',
+                        'loopnz': 'cpu->cx != 0 && !zf(cpu)',
+                        'jcxz': 'cpu->cx == 0'}[m]
+                dec = 'cpu->cx--; ' if m != 'jcxz' else ''
+                self._emit(f'{dec}if ({cond}) {{ {callee}(cpu); return; }}', orig)
+                return
+
         # --- Far jumps (resolve via relocation -> tail call) ---
         if m == 'jmp' and op1 and op1.type == OpType.FAR:
             func_name = self._resolve_far_call(inst)
@@ -487,6 +518,8 @@ def lift_segment(ne: NEHeader, seg_num: int, func_offset: int = -1):
 
     # Lift each function
     lifter = NELifter(ne, seg)
+    # Function entry offsets in this segment, for near-jmp-to-another-function.
+    lifter.seg_func_offsets = {f.offset for f in functions}
 
     target_funcs = functions
     if func_offset >= 0:

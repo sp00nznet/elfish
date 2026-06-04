@@ -8,11 +8,70 @@
  */
 #include "runtime_api.h"
 #include <stdio.h>
+#include <string.h>
+#include <ctype.h>
 
 /* Flip to 1 to trace every runtime call while bringing the program up. */
 #ifndef ELFISH_TRACE_RUNTIME
 #define ELFISH_TRACE_RUNTIME 0
 #endif
+
+#ifndef ELFISH_GAME_DIR
+#define ELFISH_GAME_DIR "D:/recomp/pc/elfish/game/ELFISH"
+#endif
+
+/* ---- DOS file I/O backed by the host game directory ---- */
+
+static const char *game_dir(void) {
+    const char *d = getenv("ELFISH_GAME_DIR");
+    return d ? d : ELFISH_GAME_DIR;
+}
+
+/* Read an ASCIIZ string from guest memory at seg:off. */
+static void read_asciiz(CPU *cpu, uint16_t seg, uint16_t off, char *out, int max) {
+    int i = 0;
+    for (; i < max - 1; i++) {
+        uint8_t c = mem_read8(cpu, seg, (uint16_t)(off + i));
+        if (c == 0) break;
+        out[i] = (char)c;
+    }
+    out[i] = 0;
+}
+
+/* Map a DOS path to a host path under the game dir: drop drive, '\\'->'/'. */
+static void map_path(const char *dos, char *out, int max) {
+    const char *p = dos;
+    if (p[0] && p[1] == ':') p += 2;        /* strip drive letter */
+    while (*p == '\\' || *p == '/') p++;    /* strip leading slashes */
+    snprintf(out, max, "%s/%s", game_dir(), p);
+    for (char *q = out; *q; q++) if (*q == '\\') *q = '/';
+}
+
+/* Open a guest file case-insensitively (DOS is case-insensitive; host may not).
+ * Tries the mapped path, then all-lower and all-upper of the final component. */
+static FILE *host_open(const char *dos, const char *mode) {
+    char path[512];
+    map_path(dos, path, sizeof(path));
+    FILE *f = fopen(path, mode);
+    if (f) return f;
+    char *slash = strrchr(path, '/');
+    char *name = slash ? slash + 1 : path;
+    char save[256];
+    snprintf(save, sizeof(save), "%s", name);
+    for (char *q = name; *q; q++) *q = (char)tolower((unsigned char)*q);
+    if ((f = fopen(path, mode))) return f;
+    snprintf(name, sizeof(save), "%s", save);
+    for (char *q = name; *q; q++) *q = (char)toupper((unsigned char)*q);
+    return fopen(path, mode);
+}
+
+/* Allocate a DOS handle (>=5) for a host FILE*. Returns 0xFFFF if full. */
+static uint16_t dos_handle_alloc(CPU *cpu, FILE *f) {
+    for (int h = 5; h < 256; h++) {
+        if (!cpu->files[h]) { cpu->files[h] = f; return (uint16_t)h; }
+    }
+    return 0xFFFF;
+}
 
 #if ELFISH_TRACE_RUNTIME
 #define TRACE(...) fprintf(stderr, __VA_ARGS__)
@@ -44,6 +103,72 @@ void dos_int21(CPU *cpu)
     case 0x19:  /* current default drive -> C: */
         cpu->al = 2;
         break;
+
+    case 0x3D: {  /* open existing file: DS:DX=name, AL=mode -> AX=handle */
+        char name[256]; read_asciiz(cpu, cpu->ds, cpu->dx, name, sizeof(name));
+        const char *mode = ((cpu->al & 3) == 1) ? "r+b" : ((cpu->al & 3) == 2) ? "r+b" : "rb";
+        FILE *f = host_open(name, mode);
+        TRACE("INT21 open '%s' -> %s\n", name, f ? "ok" : "FAIL");
+        if (!f) { cpu->flags |= FLAG_CF; cpu->ax = 2; }
+        else { cpu->ax = dos_handle_alloc(cpu, f); cpu->flags &= ~FLAG_CF; }
+        break;
+    }
+    case 0x3C: {  /* create/truncate file: DS:DX=name -> AX=handle */
+        char name[256]; read_asciiz(cpu, cpu->ds, cpu->dx, name, sizeof(name));
+        FILE *f = host_open(name, "w+b");
+        TRACE("INT21 create '%s' -> %s\n", name, f ? "ok" : "FAIL");
+        if (!f) { cpu->flags |= FLAG_CF; cpu->ax = 3; }
+        else { cpu->ax = dos_handle_alloc(cpu, f); cpu->flags &= ~FLAG_CF; }
+        break;
+    }
+    case 0x3E:  /* close handle in BX */
+        if (cpu->bx >= 5 && cpu->bx < 256 && cpu->files[cpu->bx]) {
+            fclose((FILE *)cpu->files[cpu->bx]);
+            cpu->files[cpu->bx] = NULL;
+        }
+        cpu->flags &= ~FLAG_CF;
+        break;
+    case 0x3F: {  /* read: BX=handle, CX=count, DS:DX=buf -> AX=bytes read */
+        uint16_t h = cpu->bx, n = cpu->cx, got = 0;
+        if (h >= 5 && h < 256 && cpu->files[h]) {
+            for (; got < n; got++) {
+                int c = fgetc((FILE *)cpu->files[h]);
+                if (c == EOF) break;
+                mem_write8(cpu, cpu->ds, (uint16_t)(cpu->dx + got), (uint8_t)c);
+            }
+        }
+        cpu->ax = got; cpu->flags &= ~FLAG_CF;
+        break;
+    }
+    case 0x40: {  /* write: BX=handle, CX=count, DS:DX=buf -> AX=bytes written */
+        uint16_t h = cpu->bx, n = cpu->cx, i;
+        FILE *out = (h == 1) ? stdout : (h == 2) ? stderr
+                  : (h >= 5 && h < 256) ? (FILE *)cpu->files[h] : NULL;
+        for (i = 0; out && i < n; i++)
+            fputc(mem_read8(cpu, cpu->ds, (uint16_t)(cpu->dx + i)), out);
+        cpu->ax = n; cpu->flags &= ~FLAG_CF;
+        break;
+    }
+    case 0x42: {  /* lseek: BX=handle, CX:DX=offset, AL=whence -> DX:AX=pos */
+        uint16_t h = cpu->bx;
+        if (h >= 5 && h < 256 && cpu->files[h]) {
+            long off = (long)(((uint32_t)cpu->cx << 16) | cpu->dx);
+            int whence = (cpu->al == 1) ? SEEK_CUR : (cpu->al == 2) ? SEEK_END : SEEK_SET;
+            fseek((FILE *)cpu->files[h], off, whence);
+            long pos = ftell((FILE *)cpu->files[h]);
+            cpu->ax = (uint16_t)(pos & 0xFFFF); cpu->dx = (uint16_t)((pos >> 16) & 0xFFFF);
+            cpu->flags &= ~FLAG_CF;
+        } else { cpu->flags |= FLAG_CF; cpu->ax = 6; }
+        break;
+    }
+    case 0x44:  /* IOCTL: AL=0 get device info for handle in BX */
+        if (cpu->al == 0) {
+            /* handles 0/1/2 are character devices (bit 7 set); files clear it */
+            cpu->dx = (cpu->bx <= 2) ? 0x80 : 0x00;
+            cpu->flags &= ~FLAG_CF;
+        }
+        break;
+
     default:
         TRACE("INT21 ah=%02X UNHANDLED\n", cpu->ah);
         break;

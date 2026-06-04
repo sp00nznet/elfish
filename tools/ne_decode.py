@@ -139,6 +139,14 @@ def collect_internal_code_targets(ne: NEHeader) -> dict:
     return m
 
 
+_BRANCH = frozenset((
+    'call', 'jmp',
+    'jo', 'jno', 'jb', 'jae', 'je', 'jne', 'jbe', 'ja',
+    'js', 'jns', 'jp', 'jnp', 'jl', 'jge', 'jle', 'jg',
+    'loop', 'loopz', 'loopnz', 'jcxz',
+))
+
+
 def detect_functions(seg: Segment, instructions: list, forced_entries=None) -> list:
     """Detect function boundaries.
 
@@ -171,8 +179,12 @@ def detect_functions(seg: Segment, instructions: list, forced_entries=None) -> l
                         nxt.op1 and nxt.op1.type == OpType.REG16 and nxt.op1.reg == 5 and
                         nxt.op2 and nxt.op2.type == OpType.REG16 and nxt.op2.reg == 4):
                     starts.add(local_off)
-        if (inst.mnemonic == 'call' and inst.op1 and
+        if (inst.mnemonic in _BRANCH and inst.op1 and
                 inst.op1.type in (OpType.REL8, OpType.REL16)):
+            # Every relative branch target becomes an entry (basic-block model).
+            # Over-splitting is safe: all state lives in the CPU struct/memory,
+            # and fall-through/jmp/Jcc tail calls preserve control flow across
+            # the split, so any cross-function branch resolves to a tail call.
             tgt = inst.op1.disp
             if tgt in valid:
                 starts.add(tgt)

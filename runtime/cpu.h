@@ -98,6 +98,9 @@ typedef struct CPU {
      * game's timer wait/calibration loops make progress. */
     uint32_t  bios_ticks;
 
+    /* DOS file handle table (host FILE* per handle; 0..4 reserved). */
+    void     *files[256];
+
     /* Halt flag */
     int halted;
 } CPU;
