@@ -189,6 +189,16 @@ def detect_functions(seg: Segment, instructions: list, forced_entries=None) -> l
             if tgt in valid:
                 starts.add(tgt)
 
+        # Immediate values that are valid instruction boundaries are likely
+        # near function pointers (method tables, callbacks) loaded as bare
+        # immediates with no relocation. Seed them so indirect near calls
+        # through them resolve. Safe under the basic-block model.
+        for opnd in (inst.op1, inst.op2):
+            if opnd and opnd.type == OpType.IMM16:
+                v = opnd.disp & 0xFFFF
+                if v >= 0x10 and v in valid:
+                    starts.add(v)
+
     # Far-call targets into this segment (only ones on instruction boundaries)
     for off in forced_entries:
         if off in valid:

@@ -120,6 +120,18 @@ class NELifter(Lifter):
                 self._emit(f'{{ {read} dispatch_far(cpu, _s, _o); return; }}', orig)
             return
 
+        # --- Indirect near call/jmp through memory (target in this segment) ---
+        if m in ('call', 'jmp') and op1 and op1.type == OpType.MEM:
+            seg_e, off_e = _mem_addr(op1)
+            idx = self.seg.index
+            if m == 'call':
+                self._emit(f'{{ uint16_t _o = mem_read16(cpu, {seg_e}, {off_e}); '
+                           f'push16(cpu, 0); dispatch_near(cpu, {idx}, _o); }}', orig)
+            else:  # jmp near indirect -> tail dispatch
+                self._emit(f'{{ uint16_t _o = mem_read16(cpu, {seg_e}, {off_e}); '
+                           f'dispatch_near(cpu, {idx}, _o); return; }}', orig)
+            return
+
         # --- Near jmp/Jcc to another function in this segment -> tail call ---
         # (base lifter would drop these as "out of function" comments)
         _CC = {'jo': 'cc_o', 'jno': 'cc_no', 'jb': 'cc_b', 'jae': 'cc_ae',
