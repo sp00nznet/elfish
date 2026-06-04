@@ -223,7 +223,7 @@ static void tsx_mem_alloc_impl(CPU *cpu) {
 void tsx_mem_alloc(CPU *cpu)       { TRACE("tsx_mem_alloc\n");       tsx_mem_alloc_impl(cpu); }
 void tsx_mem_alloc_small(CPU *cpu) { TRACE("tsx_mem_alloc_small\n"); tsx_mem_alloc_impl(cpu); }
 TSX_STUB(tsx_mem_free)
-TSX_STUB(tsx_file_open)
+TSX_STUB(tsx_file_open)  /* needs faithful stream-object RE; see memory notes */
 TSX_STUB(tsx_mem_realloc)
 TSX_STUB(tsx_mem_lock)
 TSX_STUB(tsx_desc_alloc)
