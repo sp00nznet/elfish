@@ -3,6 +3,15 @@ project(elfish_recomp C)
 
 set(CMAKE_C_STANDARD 11)
 
+# REQUIRED: the basic-block lift emits guest loops as tail calls
+# (f(cpu); return;). Tail-call optimization (-foptimize-sibling-calls, on at
+# -O2) turns them into jumps; without it, guest loops grow the C stack and
+# overflow. -O2 is a correctness requirement here, not just an optimization.
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+add_compile_options(-O2 -foptimize-sibling-calls)
+
 # Gather all lifted source files (segments + generated unresolved stubs)
 file(GLOB SEGMENT_SOURCES src/*.c)
 
