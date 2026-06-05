@@ -161,6 +161,17 @@ void dos_int21(CPU *cpu)
         } else { cpu->flags |= FLAG_CF; cpu->ax = 6; }
         break;
     }
+    case 0x2C: {  /* get time -> CH=hour CL=min DH=sec DL=centisec (advancing) */
+        static uint32_t t = 0; t += 3;
+        cpu->ch = (uint8_t)((t / 360000u) % 24u);
+        cpu->cl = (uint8_t)((t / 6000u) % 60u);
+        cpu->dh = (uint8_t)((t / 100u) % 60u);
+        cpu->dl = (uint8_t)(t % 100u);
+        break;
+    }
+    case 0x2A:  /* get date -> CX=year DH=month DL=day AL=weekday */
+        cpu->cx = 1993; cpu->dh = 1; cpu->dl = 1; cpu->al = 5;
+        break;
     case 0x47:  /* get current directory: DL=drive, DS:SI=64-byte buffer */
         mem_write8(cpu, cpu->ds, cpu->si, 0);  /* report root of game dir */
         cpu->ax = 0x0100; cpu->flags &= ~FLAG_CF;

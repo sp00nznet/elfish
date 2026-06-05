@@ -456,6 +456,27 @@ static inline uint16_t cpu_alloc_selector(CPU *cpu, uint32_t bytes) {
     return sel;
 }
 
+/* ── Protected-mode selector queries (LAR / LSL) ──────────────
+ * A selector is "valid" if it maps to a real (non-guard) segment. LAR returns
+ * standard present/writable data-segment access rights; LSL returns a max
+ * 16-bit limit (we don't track per-selector sizes yet). Both set the guest ZF
+ * via their boolean return (1 = valid). */
+static inline int cpu_sel_valid(CPU *cpu, uint16_t sel) {
+    return sel != 0 && cpu->sel_base[sel] != ELFISH_GUARD_BASE;
+}
+
+static inline int cpu_lar(CPU *cpu, uint16_t sel, uint16_t *out) {
+    if (!cpu_sel_valid(cpu, sel)) return 0;
+    *out = 0x0093;  /* present, ring 0, data, read/write, accessed */
+    return 1;
+}
+
+static inline int cpu_lsl(CPU *cpu, uint16_t sel, uint16_t *out) {
+    if (!cpu_sel_valid(cpu, sel)) return 0;
+    *out = 0xFFFF;
+    return 1;
+}
+
 static inline void cpu_free(CPU *cpu) {
     free(cpu->mem);
     free(cpu->sel_base);
