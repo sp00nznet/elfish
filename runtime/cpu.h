@@ -57,11 +57,11 @@ typedef struct CPU {
     union { struct { uint8_t cl, ch; }; uint16_t cx; uint32_t ecx; };
     union { struct { uint8_t dl, dh; }; uint16_t dx; uint32_t edx; };
 
-    /* Index and pointer registers */
-    uint16_t si;
-    uint16_t di;
-    uint16_t bp;
-    uint16_t sp;
+    /* Index and pointer registers (32-bit unions for 0x66 operand-size ops). */
+    union { uint16_t si; uint32_t esi; };
+    union { uint16_t di; uint32_t edi; };
+    union { uint16_t bp; uint32_t ebp; };
+    union { uint16_t sp; uint32_t esp; };
 
     /* Segment registers */
     uint16_t cs;
@@ -166,6 +166,18 @@ static inline uint16_t pop16(CPU *cpu) {
     return val;
 }
 
+/* 32-bit stack ops (operand-size 0x66 prefix). SP is still 16-bit. */
+static inline void push32(CPU *cpu, uint32_t val) {
+    cpu->sp -= 4;
+    mem_write32(cpu, cpu->ss, cpu->sp, val);
+}
+
+static inline uint32_t pop32(CPU *cpu) {
+    uint32_t val = mem_read32(cpu, cpu->ss, cpu->sp);
+    cpu->sp += 4;
+    return val;
+}
+
 /* ── Flag helpers ──────────────────────────────────────────── */
 
 static inline int parity8(uint8_t v) {
@@ -246,6 +258,45 @@ static inline void flags_logic16(CPU *cpu, uint16_t r) {
 
 static inline void flags_shift8(CPU *cpu, uint8_t r)  { set_szp8(cpu, r); }
 static inline void flags_shift16(CPU *cpu, uint16_t r) { set_szp16(cpu, r); }
+
+/* ── 32-bit flag helpers (operand-size 0x66 prefix) ────────── */
+
+static inline void set_szp32(CPU *cpu, uint32_t r) {
+    cpu->flags &= ~(FLAG_SF | FLAG_ZF | FLAG_PF);
+    if (r & 0x80000000u) cpu->flags |= FLAG_SF;
+    if (r == 0)          cpu->flags |= FLAG_ZF;
+    if (parity8((uint8_t)r)) cpu->flags |= FLAG_PF;
+}
+
+static inline uint32_t flags_add32(CPU *cpu, uint32_t a, uint32_t b) {
+    uint64_t r = (uint64_t)a + b;
+    uint32_t result = (uint32_t)r;
+    cpu->flags &= ~(FLAG_CF | FLAG_OF | FLAG_AF);
+    if (r > 0xFFFFFFFFu) cpu->flags |= FLAG_CF;
+    if (((a ^ result) & (b ^ result)) & 0x80000000u) cpu->flags |= FLAG_OF;
+    if (((a ^ b ^ result) & 0x10)) cpu->flags |= FLAG_AF;
+    set_szp32(cpu, result);
+    return result;
+}
+
+static inline uint32_t flags_sub32(CPU *cpu, uint32_t a, uint32_t b) {
+    uint32_t result = a - b;
+    cpu->flags &= ~(FLAG_CF | FLAG_OF | FLAG_AF);
+    if (a < b) cpu->flags |= FLAG_CF;
+    if (((a ^ b) & (a ^ result)) & 0x80000000u) cpu->flags |= FLAG_OF;
+    if (((a ^ b ^ result) & 0x10)) cpu->flags |= FLAG_AF;
+    set_szp32(cpu, result);
+    return result;
+}
+
+static inline void flags_cmp32(CPU *cpu, uint32_t a, uint32_t b) { flags_sub32(cpu, a, b); }
+
+static inline void flags_logic32(CPU *cpu, uint32_t r) {
+    cpu->flags &= ~(FLAG_CF | FLAG_OF);
+    set_szp32(cpu, r);
+}
+
+static inline void flags_shift32(CPU *cpu, uint32_t r) { set_szp32(cpu, r); }
 
 /* ── Flag test helpers ─────────────────────────────────────── */
 
