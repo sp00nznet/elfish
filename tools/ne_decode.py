@@ -138,7 +138,7 @@ def collect_internal_code_targets(ne: NEHeader) -> dict:
             if tseg == 0xFF or not (1 <= tseg <= len(ne.segments)):
                 continue
             if ne.segments[tseg - 1].is_code:
-                m.setdefault(tseg, set()).add(r.target_off)
+                m.setdefault(tseg, set()).add(reloc_target_off(s, r))
     ne._internal_code_targets = m
     return m
 
@@ -254,7 +254,7 @@ def detect_functions(seg: Segment, instructions: list, forced_entries=None) -> l
 _RELOC_SRC_SIZE = {0: 1, 2: 2, 3: 4, 5: 2, 11: 6, 13: 4}
 
 
-def repair_heads(seg: Segment, heads: list) -> list:
+def repair_heads(seg: Segment, heads: list, entry_targets=()) -> list:
     """Reconcile an analyzer's instruction heads with the segment's relocations.
 
     A relocation is ground truth about instruction layout: its fixup is a single
@@ -345,6 +345,30 @@ def repair_heads(seg: Segment, heads: list) -> list:
         if pos == nxt:
             hset.add(gap_start)
             hset |= set(chain[:-1])
+    # A far pointer into a code segment can only point at an instruction, so its
+    # target is a head whatever the analyzer thinks. IDA misses a handful (15
+    # here) where nothing but a data pointer reaches the code -- seg213:152A is
+    # the video driver entry, and losing it meant the VGA detection never ran and
+    # its status stayed at the "Invalid VGA-board" value it is initialised to.
+    # Decode forward from each until the split rejoins an existing head, so the
+    # whole run of instructions comes back and not just the first.
+    for t in sorted(entry_targets):
+        if t in hset or not (0 <= t < len(data)):
+            continue
+        nxt = min((x for x in hset if x > t), default=len(data))
+        chain, pos, d = [], t, Decoder(data, 0)
+        while pos < nxt:
+            d.pos = pos
+            try:
+                if d.decode_one() is None or d.pos <= pos:
+                    break
+            except IndexError:
+                break
+            pos = d.pos
+            chain.append(pos)
+        if pos == nxt:
+            hset.add(t)
+            hset |= set(chain[:-1])
     return sorted(hset)
 
 
@@ -362,7 +386,8 @@ def disassemble_segment(seg: Segment, ne: NEHeader, show_relocs: bool = True) ->
     seg_ida = load_ida_data(ne).get(str(seg.index))
     if seg_ida and seg_ida.get('heads'):
         instructions = []
-        for h in repair_heads(seg, seg_ida['heads']):
+        _targets = collect_internal_code_targets(ne).get(seg.index, set())
+        for h in repair_heads(seg, seg_ida['heads'], _targets):
             if 0 <= h < len(seg.data):
                 decoder.pos = h
                 inst = decoder.decode_one()

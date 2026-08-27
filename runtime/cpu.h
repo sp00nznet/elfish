@@ -21,6 +21,8 @@
 #include <math.h>
 #include "mem_layout.h"
 
+#define ELFISH_MAX_FREE 8192u   /* freed blocks / selectors tracked at once */
+
 /* ── Function-entry trace (opt-in: compile with -DELFISH_TRACE_FN) ── */
 /* Gated on g_trace_on so a calibrated busy-delay loop (millions of iterations,
  * no side effects) does not bury the trace. The runtime turns it on at the
@@ -104,6 +106,14 @@ typedef struct CPU {
     uint32_t  heap_next;   /* bump allocator cursor (flat offset) */
     uint32_t  heap_end;    /* end of usable memory */
     uint16_t  next_sel;    /* next dynamic selector to hand out */
+    uint32_t *sel_size;    /* bytes bound to each selector (0 = not ours) */
+    /* Freed blocks and selectors, for reuse. The guest allocates and frees the
+     * same 256KB buffer a thousand times over during startup; a bump allocator
+     * that never reclaims runs a 128MB heap dry before the video init. */
+    struct { uint32_t base, size; } *free_blk;
+    uint32_t  free_cnt;
+    uint16_t *free_sel;
+    uint32_t  free_sel_cnt;
 
     /* Emulated BIOS timer tick (0040:006C), advanced on each read so the
      * game's timer wait/calibration loops make progress. */
@@ -454,7 +464,11 @@ static inline int cpu_alloc_mem(CPU *cpu, uint32_t size) {
     cpu->mem = (uint8_t *)calloc(1, size);
     cpu->mem_size = size;
     cpu->sel_base = (uint32_t *)malloc(65536u * sizeof(uint32_t));
-    if (!cpu->mem || !cpu->sel_base) return 0;
+    cpu->sel_size = (uint32_t *)calloc(65536u, sizeof(uint32_t));
+    cpu->free_blk = malloc(ELFISH_MAX_FREE * sizeof(*cpu->free_blk));
+    cpu->free_sel = (uint16_t *)malloc(ELFISH_MAX_FREE * sizeof(uint16_t));
+    cpu->free_cnt = cpu->free_sel_cnt = 0;
+    if (!cpu->mem || !cpu->sel_base || !cpu->sel_size || !cpu->free_blk || !cpu->free_sel) return 0;
     /* Default every selector to the guard region, then map the static image
      * segments (1..NUM_SEG) to their flat bases. */
     for (uint32_t s = 0; s < 65536u; s++)
@@ -472,14 +486,53 @@ static inline int cpu_alloc_mem(CPU *cpu, uint32_t size) {
 /* Allocate `bytes` from the flat heap and bind a fresh selector to it.
  * Returns the selector (0 on out-of-memory). The region is already zeroed. */
 static inline uint16_t cpu_alloc_selector(CPU *cpu, uint32_t bytes) {
-    uint32_t base = (cpu->heap_next + 0xFu) & ~0xFu;
     if (bytes == 0) bytes = 16;
-    if (base + bytes > cpu->heap_end || cpu->next_sel == 0)
-        return 0;
-    cpu->heap_next = base + bytes;
-    uint16_t sel = cpu->next_sel++;
+    bytes = (bytes + 0xFu) & ~0xFu;
+    uint32_t base = 0;
+    /* First fit over reclaimed blocks, then bump. Splitting the remainder back
+     * keeps a run of same-sized alloc/free pairs from fragmenting the heap. */
+    for (uint32_t i = 0; i < cpu->free_cnt; i++) {
+        if (cpu->free_blk[i].size < bytes) continue;
+        base = cpu->free_blk[i].base;
+        if (cpu->free_blk[i].size >= bytes + 16u) {
+            cpu->free_blk[i].base += bytes;
+            cpu->free_blk[i].size -= bytes;
+        } else {
+            bytes = cpu->free_blk[i].size;
+            cpu->free_blk[i] = cpu->free_blk[--cpu->free_cnt];
+        }
+        break;
+    }
+    if (!base) {
+        base = (cpu->heap_next + 0xFu) & ~0xFu;
+        if (base + bytes > cpu->heap_end) return 0;
+        cpu->heap_next = base + bytes;
+    }
+    uint16_t sel;
+    if (cpu->free_sel_cnt) sel = cpu->free_sel[--cpu->free_sel_cnt];
+    else if (cpu->next_sel) sel = cpu->next_sel++;
+    else return 0;
     cpu->sel_base[sel] = base;
+    cpu->sel_size[sel] = bytes;
+    memset(cpu->mem + base, 0, bytes);   /* callers expect a zeroed block */
     return sel;
+}
+
+/* Return a dynamically allocated selector's memory to the free list. Ignores
+ * anything that is not one of ours, so a caller passing the wrong register is
+ * a no-op rather than corruption.
+ * ponytail: first-fit with no coalescing, and a full list simply leaks the
+ * block. Coalesce if fragmentation ever shows up as an allocation failure. */
+static inline void cpu_free_selector(CPU *cpu, uint16_t sel) {
+    if (sel < 0x4000u || !cpu->sel_size[sel]) return;
+    if (cpu->free_cnt < ELFISH_MAX_FREE) {
+        cpu->free_blk[cpu->free_cnt].base = cpu->sel_base[sel];
+        cpu->free_blk[cpu->free_cnt].size = cpu->sel_size[sel];
+        cpu->free_cnt++;
+    }
+    if (cpu->free_sel_cnt < ELFISH_MAX_FREE) cpu->free_sel[cpu->free_sel_cnt++] = sel;
+    cpu->sel_size[sel] = 0;
+    cpu->sel_base[sel] = ELFISH_GUARD_BASE;
 }
 
 /* ── Protected-mode selector queries (LAR / LSL) ──────────────
@@ -506,6 +559,8 @@ static inline int cpu_lsl(CPU *cpu, uint16_t sel, uint16_t *out) {
 static inline void cpu_free(CPU *cpu) {
     free(cpu->mem);
     free(cpu->sel_base);
+    free(cpu->sel_size); free(cpu->free_blk); free(cpu->free_sel);
+    cpu->sel_size = NULL; cpu->free_blk = NULL; cpu->free_sel = NULL;
     cpu->mem = NULL;
     cpu->sel_base = NULL;
 }

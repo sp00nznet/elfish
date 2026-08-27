@@ -408,7 +408,16 @@ static void tsx_mem_alloc_impl(CPU *cpu) {
 }
 void tsx_mem_alloc(CPU *cpu)       { TRACE("tsx_mem_alloc\n");       tsx_mem_alloc_impl(cpu); }
 void tsx_mem_alloc_small(CPU *cpu) { TRACE("tsx_mem_alloc_small\n"); tsx_mem_alloc_impl(cpu); }
-TSX_STUB(tsx_mem_free)
+/* Free (ordinals 58 and 68). The selector arrives in AX; cpu_free_selector
+ * ignores anything that is not a live dynamic selector, so the huge-block form
+ * passing it elsewhere costs nothing. Startup allocates and frees the same
+ * 256KB buffer over a thousand times, so this is not optional bookkeeping --
+ * without it the heap is gone before the video init runs. */
+void tsx_mem_free(CPU *cpu) {
+    TRACE("tsx_mem_free ax=%04X\n", cpu->ax);
+    cpu_free_selector(cpu, cpu->ax);
+    cpu->sp += 4;
+}
 TSX_STUB(tsx_file_open)  /* needs faithful stream-object RE; see memory notes */
 TSX_STUB(tsx_mem_realloc)
 TSX_STUB(tsx_mem_lock)
@@ -419,13 +428,22 @@ TSX_STUB(tsx_desc_get_base)
  * then walks/initializes a zeroed free-list inside the block. */
 void tsx_huge_alloc(CPU *cpu) {
     TRACE("tsx_huge_alloc\n");
-    uint16_t sel = cpu_alloc_selector(cpu, 0x100000u);  /* 1 MB */
+    /* AX is the size in paragraphs, same as the small form. It used to take a
+     * flat 1MB regardless. */
+    uint32_t bytes = (uint32_t)cpu->ax * 16u;
+    if (bytes < 0x1000u) bytes = 0x1000u;
+    uint16_t sel = cpu_alloc_selector(cpu, bytes);
     cpu->ax = 0;
     cpu->dx = sel;
     if (sel) cpu->flags &= ~FLAG_CF; else cpu->flags |= FLAG_CF;
     cpu->sp += 4;
 }
-TSX_STUB(tsx_huge_free)
+void tsx_huge_free(CPU *cpu) {
+    TRACE("tsx_huge_free ax=%04X si=%04X\n", cpu->ax, cpu->si);
+    cpu_free_selector(cpu, cpu->ax);
+    cpu_free_selector(cpu, cpu->si);
+    cpu->sp += 4;
+}
 TSX_STUB(tsx_file_create)
 TSX_STUB(tsx_file_write)
 TSX_STUB(tsx_file_seek)
