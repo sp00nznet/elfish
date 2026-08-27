@@ -12,7 +12,7 @@ import sys
 import os
 import struct
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 # Add pcrecomp tools to path
@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 sys.path.insert(0, os.path.dirname(__file__))
 
 from decode16 import Decoder, Instruction, OpType, Operand
-from ne_parse import parse_ne, NEHeader, Segment, Relocation
+from ne_parse import parse_ne, NEHeader, Segment, Relocation, reloc_target_off
 from fpu_decode import decode_fpu, format_fpu
 
 
@@ -54,6 +54,7 @@ def build_reloc_map(seg: Segment, ne: NEHeader) -> dict:
     """Build a map of offset -> RelocAnnotation for a segment."""
     reloc_map = {}
     for r in seg.relocations:
+        eff_off = reloc_target_off(seg, r)   # additive: fold in the addend
         target_type = r.flags & 3
         if target_type == 0:  # Internal
             if r.target_seg == 0xFF:
@@ -62,9 +63,9 @@ def build_reloc_map(seg: Segment, ne: NEHeader) -> dict:
                 target_seg = ne.segments[r.target_seg - 1] if r.target_seg <= len(ne.segments) else None
                 if target_seg:
                     seg_type = 'CODE' if target_seg.is_code else 'DATA'
-                    desc = f"seg{r.target_seg}:{r.target_off:04X} ({seg_type})"
+                    desc = f"seg{r.target_seg}:{eff_off:04X} ({seg_type})"
                 else:
-                    desc = f"seg{r.target_seg}:{r.target_off:04X}"
+                    desc = f"seg{r.target_seg}:{eff_off:04X}"
         elif target_type == 1:  # Import by ordinal
             mod_name = ne.module_names[r.module_idx - 1] if r.module_idx <= len(ne.module_names) else f"mod{r.module_idx}"
             desc = f"{mod_name}.{r.ordinal}"
@@ -82,7 +83,10 @@ def build_reloc_map(seg: Segment, ne: NEHeader) -> dict:
         # the next location needing the same fixup, terminated by 0xFFFF.
         # Additive relocations are not chained (the location holds an addend).
         if r.additive or not seg.data:
-            reloc_map[r.offset] = RelocAnnotation(offset=r.offset, reloc=r,
+            # The addend at the site is part of the target; fold it in so every
+            # consumer sees the real destination (see reloc_target_off).
+            eff = replace(r, target_off=eff_off, additive=False)
+            reloc_map[r.offset] = RelocAnnotation(offset=r.offset, reloc=eff,
                                                   target_desc=full_desc)
             continue
 

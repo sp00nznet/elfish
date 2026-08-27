@@ -33,3 +33,6 @@ __pycache__/
 *.id2
 *.nam
 *.til
+
+# Function-traced build (cmake -B build_trace -DCMAKE_C_FLAGS="-DELFISH_TRACE_FN=1 ...")
+build_trace/

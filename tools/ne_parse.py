@@ -138,6 +138,36 @@ class NEHeader:
         return sum(len(s.relocations) for s in self.segments)
 
 
+def reloc_target_off(seg, r, off=None):
+    """Effective target offset of an internal relocation at one fixup site.
+
+    A non-additive record replaces the value at the site outright, so the
+    record's target_off is the answer. An ADDITIVE record stores an ADDEND
+    there instead of a chain link, and the loader adds the target to it.
+    Dropping that addend silently retargets the fixup: every one of
+    ELFISH.EXE's 268 additive FAR_PTR records carries a nonzero addend, and
+    they select an entry of a multi-entry thunk -- e.g. seg208:11DA+0x1C is
+    seg208:11F6, the sprintf entry whose RETF pops the caller's 10 argument
+    bytes. Land on 11DA instead and the call returns with the stack 10 bytes
+    low, quietly corrupting the caller's registers.
+
+    Only internal references are resolved this way; for imports the addend
+    belongs to the import thunk and target_off is not an address at all.
+    """
+    if not r.additive or not seg.data or (r.flags & 3) != 0:
+        return r.target_off
+    off = r.offset if off is None else off
+    if r.src_type == 11:                       # PTR48: 32-bit offset field
+        if off + 3 >= len(seg.data):
+            return r.target_off
+        return (r.target_off + struct.unpack_from("<I", seg.data, off)[0]) & 0xFFFFFFFF
+    if r.src_type in (3, 5, 13):               # FAR_PTR / OFFSET16: 16-bit field
+        if off + 1 >= len(seg.data):
+            return r.target_off
+        return (r.target_off + struct.unpack_from("<H", seg.data, off)[0]) & 0xFFFF
+    return r.target_off                        # SELECTOR/LOBYTE carry no offset
+
+
 def parse_ne(filepath: str) -> NEHeader:
     """Parse an NE executable file."""
     with open(filepath, 'rb') as f:

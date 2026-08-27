@@ -33,6 +33,10 @@ static int load_image(CPU *cpu, const char *path)
 
 int main(int argc, char *argv[])
 {
+    /* The -DELFISH_TRACE_FN trace is millions of lines; unbuffered stderr
+     * makes it slower than the program. */
+    setvbuf(stderr, NULL, _IOFBF, 1 << 20);
+
     const char *img = (argc > 1) ? argv[1] : ELFISH_IMAGE_PATH;
 
     CPU cpu;

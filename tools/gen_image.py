@@ -22,7 +22,7 @@ import struct
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 sys.path.insert(0, os.path.abspath(os.path.join(ROOT, '..', 'tools', 'tools', 'disasm')))
-from ne_parse import parse_ne
+from ne_parse import parse_ne, reloc_target_off
 
 PARA = 16
 MAX_SEL = 0x10000  # selector table covers any 16-bit value (raw selectors too)
@@ -96,20 +96,21 @@ def main():
                 continue
             sel = tseg                  # normalized selector == segment index
             for off in chain_offsets(s, r):
+                toff = reloc_target_off(s, r, off)
                 addr = base[s.index] + off
                 if addr + 1 >= image_size:
                     continue
                 if r.src_type == 2:        # SELECTOR (2 bytes)
                     struct.pack_into('<H', image, addr, sel)
                 elif r.src_type == 5:      # OFFSET16 (2 bytes)
-                    struct.pack_into('<H', image, addr, r.target_off & 0xFFFF)
+                    struct.pack_into('<H', image, addr, toff & 0xFFFF)
                 elif r.src_type == 3:      # FAR_PTR (off16 + sel16)
                     if addr + 3 < image_size:
-                        struct.pack_into('<H', image, addr, r.target_off & 0xFFFF)
+                        struct.pack_into('<H', image, addr, toff & 0xFFFF)
                         struct.pack_into('<H', image, addr + 2, sel)
                 elif r.src_type == 11:     # PTR48 (off32 + sel16)
                     if addr + 5 < image_size:
-                        struct.pack_into('<I', image, addr, r.target_off & 0xFFFFFFFF)
+                        struct.pack_into('<I', image, addr, toff & 0xFFFFFFFF)
                         struct.pack_into('<H', image, addr + 4, sel)
                 else:
                     continue

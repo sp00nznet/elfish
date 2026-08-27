@@ -14,6 +14,15 @@
 void dispatch_far(CPU *cpu, uint16_t seg, uint16_t off);
 void dispatch_near(CPU *cpu, uint16_t seg, uint16_t off);
 
+/* ---- Divide by zero ----
+ * The lifter guards every div/idiv with this instead of letting C divide by
+ * zero (undefined behaviour, SIGFPE on x86). On the real 386 this raises #DE;
+ * here it reports the site and leaves the quotient/remainder registers alone,
+ * so a stray zero divisor shows up as a diagnostic rather than a crash with no
+ * context. ponytail: no INT 0 vectoring -- add it if the game installs a #DE
+ * handler and depends on it. */
+void catz_div0(const char *op);
+
 /* ---- Software interrupts ---- */
 void dos_int21(CPU *cpu);
 void bios_int10(CPU *cpu);

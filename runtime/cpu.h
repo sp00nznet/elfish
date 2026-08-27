@@ -22,8 +22,15 @@
 #include "mem_layout.h"
 
 /* ── Function-entry trace (opt-in: compile with -DELFISH_TRACE_FN) ── */
+/* Gated on g_trace_on so a calibrated busy-delay loop (millions of iterations,
+ * no side effects) does not bury the trace. The runtime turns it on at the
+ * point of interest -- see ELFISH_TRACE_FROM in tsxlib_stubs.c. */
 #ifdef ELFISH_TRACE_FN
-#define TRACE_FN(n) fprintf(stderr, "FN %s\n", (n))
+extern int g_trace_on;
+#define TRACE_FN(n) do { if (g_trace_on) fprintf(stderr, "FN %s "  \
+    "ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X "  \
+    "ds=%04X es=%04X ss=%04X\n", (n), cpu->ax, cpu->bx, cpu->cx, cpu->dx,  \
+    cpu->si, cpu->di, cpu->bp, cpu->sp, cpu->ds, cpu->es, cpu->ss); } while (0)
 #else
 #define TRACE_FN(n) ((void)0)
 #endif
@@ -68,6 +75,9 @@ typedef struct CPU {
     uint16_t ds;
     uint16_t es;
     uint16_t ss;
+    /* 386 extra segment registers (0x64/0x65 prefixes). */
+    uint16_t fs;
+    uint16_t gs;
 
     /* Instruction pointer (debug) */
     uint16_t ip;
@@ -493,6 +503,18 @@ static inline uint8_t port_in8(CPU *cpu, uint16_t port) {
 
 static inline void port_out8(CPU *cpu, uint16_t port, uint8_t val) {
     (void)cpu; (void)port; (void)val;
+}
+
+/* 16-bit port access. The VGA/VESA and sound registers this game drives are
+ * mostly paired 8-bit ports written as one word (index in AL, data in AH), so
+ * split it rather than inventing a separate word-wide device model. */
+static inline uint16_t port_in16(CPU *cpu, uint16_t port) {
+    return (uint16_t)(port_in8(cpu, port) | (port_in8(cpu, (uint16_t)(port + 1)) << 8));
+}
+
+static inline void port_out16(CPU *cpu, uint16_t port, uint16_t val) {
+    port_out8(cpu, port, (uint8_t)val);
+    port_out8(cpu, (uint16_t)(port + 1), (uint8_t)(val >> 8));
 }
 
 #endif /* ELFISH_CPU_H */

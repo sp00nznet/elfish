@@ -10,6 +10,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
+#include <conio.h>
+#include <windows.h>
 
 /* Flip to 1 to trace every runtime call while bringing the program up. */
 #ifndef ELFISH_TRACE_RUNTIME
@@ -17,7 +20,7 @@
 #endif
 
 #ifndef ELFISH_GAME_DIR
-#define ELFISH_GAME_DIR "D:/recomp/pc/elfish/game/ELFISH"
+#define ELFISH_GAME_DIR "game/ELFISH"
 #endif
 
 /* ---- DOS file I/O backed by the host game directory ---- */
@@ -79,10 +82,27 @@ static uint16_t dos_handle_alloc(CPU *cpu, FILE *f) {
 #define TRACE(...) ((void)0)
 #endif
 
+/* Function tracing (-DELFISH_TRACE_FN) starts off and arms on the first INT21
+ * call whose AH matches ELFISH_TRACE_FROM (hex). Without a trigger the trace is
+ * buried under the millions of iterations of the calibrated delay loop that
+ * runs before anything interesting. Unset = never; "00" = from the start. */
+int g_trace_on = 0;
+
+static void trace_arm(uint8_t ah) {
+    const char *from = getenv("ELFISH_TRACE_FROM");
+    if (from && ah == (uint8_t)strtol(from, NULL, 16)) g_trace_on = 1;
+}
+
+/* A zero divisor would be undefined behaviour in C; report it and carry on. */
+void catz_div0(const char *op) {
+    fprintf(stderr, "DIVIDE BY ZERO in %s\n", op);
+}
+
 /* ---- Software interrupts ---- */
 void dos_int21(CPU *cpu)
 {
-    TRACE("INT21 ah=%02X al=%02X\n", cpu->ah, cpu->al);
+    TRACE("INT21 ah=%02X al=%02X ds:dx=%04X:%04X\n", cpu->ah, cpu->al, cpu->ds, cpu->dx);
+    trace_arm(cpu->ah);
     switch (cpu->ah) {
     case 0x4C:  /* terminate process with return code in AL */
         printf("[INT21/4C] program requested exit, code=%u\n", cpu->al);
@@ -176,6 +196,33 @@ void dos_int21(CPU *cpu)
         mem_write8(cpu, cpu->ds, cpu->si, 0);  /* report root of game dir */
         cpu->ax = 0x0100; cpu->flags &= ~FLAG_CF;
         break;
+    case 0x3B: {  /* chdir: DS:DX=path. Host paths always resolve against the
+                   * game dir, so there is no cwd to move -- just succeed. */
+        char name[256]; read_asciiz(cpu, cpu->ds, cpu->dx, name, sizeof(name));
+        TRACE("INT21 chdir '%s'\n", name);
+        cpu->flags &= ~FLAG_CF;
+        break;
+    }
+    case 0x41: {  /* delete file: DS:DX=name */
+        char name[256], path[512];
+        read_asciiz(cpu, cpu->ds, cpu->dx, name, sizeof(name));
+        map_path(name, path, sizeof(path));
+        int ok = (remove(path) == 0);
+        TRACE("INT21 unlink '%s' -> %s\n", name, ok ? "ok" : "FAIL");
+        if (ok) cpu->flags &= ~FLAG_CF;
+        else { cpu->flags |= FLAG_CF; cpu->ax = 2; }
+        break;
+    }
+    case 0x43: {  /* get/set file attributes: DS:DX=name, AL=0 get -> CX=attr */
+        char name[256]; read_asciiz(cpu, cpu->ds, cpu->dx, name, sizeof(name));
+        FILE *f = host_open(name, "rb");
+        TRACE("INT21 attr-%s '%s' -> %s\n", cpu->al ? "set" : "get", name,
+              f ? "exists" : "MISSING");
+        if (f) fclose(f);
+        if (!f) { cpu->flags |= FLAG_CF; cpu->ax = 2; }   /* file not found */
+        else { cpu->cx = 0x20; cpu->flags &= ~FLAG_CF; }  /* archive bit */
+        break;
+    }
     case 0x44:  /* IOCTL: AL=0 get device info for handle in BX */
         if (cpu->al == 0) {
             /* handles 0/1/2 are character devices (bit 7 set); files clear it */
@@ -185,12 +232,61 @@ void dos_int21(CPU *cpu)
         break;
 
     default:
-        TRACE("INT21 ah=%02X UNHANDLED\n", cpu->ah);
+        /* DOS reports an unsupported call as CF=1, AX=1. Leaving the flags
+         * untouched is not "do nothing": the caller tests CF, so an
+         * unimplemented service takes a random branch depending on whatever
+         * set the flags last. Fail loudly and deterministically instead. */
+        fprintf(stderr, "INT21 ah=%02X al=%02X UNHANDLED\n", cpu->ah, cpu->al);
+        cpu->flags |= FLAG_CF;
+        cpu->ax = 1;
         break;
     }
 }
 void bios_int10(CPU *cpu)  { TRACE("INT10 ah=%02X\n", cpu->ah); (void)cpu; }
-void bios_int16(CPU *cpu)  { TRACE("INT16 ah=%02X\n", cpu->ah); (void)cpu; }
+/* ---- Keyboard (INT 16h) ----
+ * Backed by the host console via conio, so the DOS-era text prompts are
+ * really interactive. When stdin is not a console _kbhit() just reports no
+ * key, which is the correct "nobody pressed anything" answer rather than a
+ * fabricated one. Extended keys arrive from _getch() as a 0/0xE0 lead byte
+ * followed by the scan code; INT 16h wants those as AL=0, AH=scan.
+ * ponytail: console only. SDL takes over once there is a video window. */
+static int kb_pending = -1;   /* one-key pushback for the peek/read pair */
+
+static int kb_poll(void) {
+    if (kb_pending >= 0) return kb_pending;
+    if (!_kbhit()) return -1;
+    int c = _getch();
+    if (c == 0 || c == 0xE0) kb_pending = (_getch() & 0xFF) << 8;  /* AL=0, AH=scan */
+    else kb_pending = (c & 0xFF) | ((c & 0xFF) << 8);              /* ascii in AL */
+    return kb_pending;
+}
+
+void bios_int16(CPU *cpu)
+{
+    TRACE("INT16 ah=%02X\n", cpu->ah);
+    switch (cpu->ah) {
+    case 0x00: case 0x10: {  /* wait for a key, remove it from the buffer */
+        int k;
+        while ((k = kb_poll()) < 0)
+            Sleep(5);        /* a real BIOS spins here; do not burn a core */
+        kb_pending = -1;
+        cpu->ax = (uint16_t)k;
+        cpu->flags &= ~FLAG_ZF;
+        break;
+    }
+    case 0x01: case 0x11: {  /* peek: ZF=1 when the buffer is empty */
+        int k = kb_poll();
+        if (k < 0) { cpu->flags |= FLAG_ZF; }
+        else { cpu->ax = (uint16_t)k; cpu->flags &= ~FLAG_ZF; }
+        break;
+    }
+    case 0x02: case 0x12:    /* shift/toggle state: nothing held */
+        cpu->al = 0;
+        break;
+    default:
+        break;
+    }
+}
 void mouse_int33(CPU *cpu) { TRACE("INT33 ax=%04X\n", cpu->ax); (void)cpu; }
 void int_handler(CPU *cpu, int int_num) { TRACE("INT %02X\n", int_num); (void)cpu; (void)int_num; }
 

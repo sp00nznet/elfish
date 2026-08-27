@@ -13,6 +13,7 @@ Usage:
 
 import sys
 import os
+import re
 from typing import Optional
 
 _PC = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tools', 'tools'))
@@ -555,6 +556,22 @@ def lift_segment(ne: NEHeader, seg_num: int, func_offset: int = -1):
             func.label, func_insts, seg.file_offset + func.offset, func.is_far)
         # Inject an entry-trace marker (compiles to nothing without -DELFISH_TRACE_FN)
         code = code.replace('{\n', '{\n    TRACE_FN("%s");\n' % func.label, 1)
+
+        # Drop the base lifter's fall-through line. It addresses functions by
+        # absolute file offset and splits that with the real-mode seg<<4 rule,
+        # which names nothing in a protected-mode NE -- it lands on
+        # recomp_dispatch() with a bogus selector. The NE-correct fall-through
+        # is emitted just below, from off_to_label.
+        code = re.sub(r'^.*/\* fallthrough 0x[0-9A-F]+ \*/\n', '', code, flags=re.M)
+
+        # Same for the base's out-of-function tail jumps. NELifter tail-calls
+        # these itself whenever the target is a known function entry; what is
+        # left over targets an address that is not one -- almost all of it inside
+        # the TSXLIB FPU-emulation trampolines, where the 0x9B lead bytes are
+        # patched at load time and the decode desyncs. Keep the branch visible
+        # in the source rather than dispatching on a meaningless address.
+        code = re.sub(r'recomp_dispatch\(cpu, [^)]*\); return;',
+                      '/* dropped: target is not a function entry */', code)
 
         # Fall-through: if the last instruction is not a control-flow terminator,
         # execution flows into the next function. Emit that as a tail call so the
