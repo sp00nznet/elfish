@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(_PC, 'lift'))
 sys.path.insert(0, os.path.dirname(__file__))
 
 from decode16 import Decoder, Instruction, OpType, Operand, REG16_NAMES
+import lift16
 from lift16 import Lifter, _read, _write, _reg16, _sreg, _mem_addr, _label
 from ne_parse import parse_ne, NEHeader, Segment
 from ne_decode import disassemble_segment, build_reloc_map
@@ -34,6 +35,12 @@ class NELifter(Lifter):
 
     def __init__(self, ne: NEHeader, seg: Segment):
         super().__init__()
+        # A cs-relative operand -- a switch jump table, most importantly -- lives
+        # in the segment the FUNCTION is in, which is a constant. cpu->cs is not
+        # maintained across far calls, so reading a jump table through it lands
+        # wherever the last far call left CS. lift16 uses this global to emit the
+        # constant instead; unset, it falls back to cpu->cs.
+        lift16._CODE_SEG = str(seg.index)
         self.ne = ne
         self.seg = seg
         self.reloc_map = build_reloc_map(seg, ne)

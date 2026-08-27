@@ -88,6 +88,33 @@ static uint16_t dos_handle_alloc(CPU *cpu, FILE *f) {
  * iterations of the calibrated delay loop that runs before anything
  * interesting. Unset = never; "00" = from the start. */
 int g_trace_on = 0;
+#ifdef ELFISH_TRACE_FN
+const char *g_cur_fn = "?";
+/* No segment is 0xFFFFFFFF, so an unset watch never matches. */
+uint32_t g_watch_seg = 0xFFFFFFFFu, g_watch_lo = 0, g_watch_hi = 0;
+
+void watch_write(CPU *cpu, uint16_t seg, uint16_t off, uint32_t val, int size) {
+    if (off + (uint32_t)size <= g_watch_lo || off >= g_watch_hi) return;
+    fprintf(stderr, "WATCH %04X:%04X <- %0*X (%d) in %-16s ds:si=%04X:%04X es:di=%04X:%04X cx=%04X ax=%04X bx=%04X\n",
+            seg, off, size * 2, val, size, g_cur_fn,
+            cpu->ds, cpu->si, cpu->es, cpu->di, cpu->cx, cpu->ax, cpu->bx);
+}
+
+/* ELFISH_WATCH="<seg hex>:<off hex>[+len]" -- see cpu.h. */
+static void watch_init(void) {
+    const char *w = getenv("ELFISH_WATCH");
+    if (!w) return;
+    char *end;
+    unsigned long s = strtoul(w, &end, 16);
+    if (*end != ':') return;
+    unsigned long o = strtoul(end + 1, &end, 16);
+    unsigned long n = (*end == '+') ? strtoul(end + 1, NULL, 16) : 1;
+    g_watch_seg = (uint32_t)s; g_watch_lo = (uint32_t)o; g_watch_hi = (uint32_t)(o + n);
+    fprintf(stderr, "watching %04lX:%04lX+%lX\n", s, o, n);
+}
+#else
+static void watch_init(void) { }
+#endif
 
 static void trace_arm(uint8_t ah) {
     static int seen = 0;
@@ -108,6 +135,8 @@ void catz_div0(const char *op) {
 void dos_int21(CPU *cpu)
 {
     TRACE("INT21 ah=%02X al=%02X ds:dx=%04X:%04X\n", cpu->ah, cpu->al, cpu->ds, cpu->dx);
+    static int once = 0;
+    if (!once) { once = 1; watch_init(); }
     trace_arm(cpu->ah);
     switch (cpu->ah) {
     case 0x4C:  /* terminate process with return code in AL */

@@ -203,6 +203,21 @@ def detect_functions(seg: Segment, instructions: list, forced_entries=None) -> l
                 if v >= 0x10 and v in valid:
                     starts.add(v)
 
+        # Switch jump table: `jmp word cs:[reg+disp]`. The arms are reachable
+        # only through the table, so nothing else seeds them -- and a missing arm
+        # is silent, because the indirect jump just reports a dispatch miss and
+        # returns. Walk the table while every word is a real instruction
+        # boundary in this segment; the first that is not ends it.
+        if (inst.mnemonic == 'jmp' and inst.op1 and inst.op1.type == OpType.MEM
+                and inst.op1.seg == 'cs' and inst.op1.size != 4 and seg.data):
+            t = inst.op1.disp & 0xFFFF
+            while t + 1 < len(seg.data):
+                arm = struct.unpack_from('<H', seg.data, t)[0]
+                if arm not in valid:
+                    break
+                starts.add(arm)
+                t += 2
+
     # Far-call targets into this segment (only ones on instruction boundaries)
     for off in forced_entries:
         if off in valid:

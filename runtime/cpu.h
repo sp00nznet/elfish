@@ -27,7 +27,8 @@
  * point of interest -- see ELFISH_TRACE_FROM in tsxlib_stubs.c. */
 #ifdef ELFISH_TRACE_FN
 extern int g_trace_on;
-#define TRACE_FN(n) do { if (g_trace_on) fprintf(stderr, "FN %s "  \
+extern const char *g_cur_fn;    /* last function entered, for the watchpoint */
+#define TRACE_FN(n) do { g_cur_fn = (n); if (g_trace_on) fprintf(stderr, "FN %s "  \
     "ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X "  \
     "ds=%04X es=%04X ss=%04X\n", (n), cpu->ax, cpu->bx, cpu->cx, cpu->dx,  \
     cpu->si, cpu->di, cpu->bp, cpu->sp, cpu->ds, cpu->es, cpu->ss); } while (0)
@@ -132,7 +133,20 @@ static inline uint8_t mem_read8(CPU *cpu, uint16_t seg, uint16_t off) {
     return cpu->mem[seg_off(cpu, seg, off)];
 }
 
+/* Memory watchpoint: ELFISH_WATCH="<seg hex>:<off hex>[+len]" reports every
+ * write into that range together with the function doing it. Finding which
+ * code fills a buffer is otherwise guesswork, because the pointer is computed
+ * rather than a constant the source can be grepped for. */
+#ifdef ELFISH_TRACE_FN
+extern uint32_t g_watch_seg, g_watch_lo, g_watch_hi;
+void watch_write(CPU *cpu, uint16_t seg, uint16_t off, uint32_t val, int size);
+#define WATCH(c, s, o, v, n) do { if ((s) == g_watch_seg) watch_write(c, s, o, v, n); } while (0)
+#else
+#define WATCH(c, s, o, v, n) ((void)0)
+#endif
+
 static inline void mem_write8(CPU *cpu, uint16_t seg, uint16_t off, uint8_t val) {
+    WATCH(cpu, seg, off, val, 1);
     cpu->mem[seg_off(cpu, seg, off)] = val;
 }
 
@@ -148,6 +162,7 @@ static inline uint16_t mem_read16(CPU *cpu, uint16_t seg, uint16_t off) {
 }
 
 static inline void mem_write16(CPU *cpu, uint16_t seg, uint16_t off, uint16_t val) {
+    WATCH(cpu, seg, off, val, 2);
     uint32_t addr = seg_off(cpu, seg, off);
     cpu->mem[addr] = (uint8_t)(val & 0xFF);
     cpu->mem[addr + 1] = (uint8_t)(val >> 8);
@@ -159,6 +174,7 @@ static inline uint32_t mem_read32(CPU *cpu, uint16_t seg, uint16_t off) {
 }
 
 static inline void mem_write32(CPU *cpu, uint16_t seg, uint16_t off, uint32_t val) {
+    WATCH(cpu, seg, off, val, 4);
     mem_write16(cpu, seg, off, (uint16_t)(val & 0xFFFF));
     mem_write16(cpu, seg, off + 2, (uint16_t)(val >> 16));
 }
