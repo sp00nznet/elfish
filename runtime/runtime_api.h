@@ -61,7 +61,7 @@ void tsx_desc_alloc(CPU *cpu);
 void tsx_desc_get_base(CPU *cpu);
 void tsx_huge_alloc(CPU *cpu);
 void tsx_huge_free(CPU *cpu);
-void tsx_file_create(CPU *cpu);
+void tsx_dpmi_int(CPU *cpu);   /* ordinal 72: DPMI real-mode interrupt */
 void tsx_file_write(CPU *cpu);
 void tsx_file_seek(CPU *cpu);
 

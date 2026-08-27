@@ -87,6 +87,9 @@ static uint16_t dos_handle_alloc(CPU *cpu, FILE *f) {
  * Without a trigger the trace is buried under the tens of millions of
  * iterations of the calibrated delay loop that runs before anything
  * interesting. Unset = never; "00" = from the start. */
+static uint16_t g_vesa_bank = 0;   /* VBE window position, in granularity units */
+static uint16_t g_vesa_start_x = 0, g_vesa_start_y = 0;   /* VBE display start */
+
 int g_trace_on = 0;
 #ifdef ELFISH_TRACE_FN
 const char *g_cur_fn = "?";
@@ -277,6 +280,97 @@ void dos_int21(CPU *cpu)
         break;
     }
 }
+/* ---- VESA / VBE 1.2 (INT 10h AX=4Fxx) ----
+ * The game asks for mode 0x100, 640x400x256, through a banked 64KB window at
+ * A000 -- the SVGA path its box advertises. Reporting one mode honestly is
+ * better than reporting a long list we cannot set. Everything here describes a
+ * plain VBE 1.2 banked framebuffer; there is no linear-framebuffer capability
+ * bit, because there is no VBE 2.0.
+ * ponytail: the window is real memory and nothing displays it yet. Wiring it to
+ * SDL is the next step; the shape of what the guest writes does not change. */
+#define VESA_MODE      0x0100u
+#define VESA_WIDTH     640u
+#define VESA_HEIGHT    400u
+#define VESA_VRAM_64K  16u        /* 1 MB, in 64KB units */
+
+static void vesa_str(CPU *cpu, uint16_t seg, uint16_t off, const char *s) {
+    for (; *s; s++, off++) mem_write8(cpu, seg, off, (uint8_t)*s);
+    mem_write8(cpu, seg, off, 0);
+}
+
+static void vesa(CPU *cpu) {
+    uint16_t seg = cpu->es, off = cpu->di;
+    switch (cpu->al) {
+    case 0x00: {   /* get controller info -> 512-byte VbeInfoBlock at ES:DI */
+        for (uint16_t i = 0; i < 512; i++) mem_write8(cpu, seg, (uint16_t)(off + i), 0);
+        vesa_str(cpu, seg, off, "VESA");
+        mem_write16(cpu, seg, (uint16_t)(off + 0x04), 0x0102);   /* VBE 1.2 */
+        /* OEM string and the mode list live in the tail of the same block, so
+         * the far pointers stay inside memory the caller already owns. */
+        mem_write16(cpu, seg, (uint16_t)(off + 0x06), (uint16_t)(off + 0x100));
+        mem_write16(cpu, seg, (uint16_t)(off + 0x08), seg);
+        mem_write16(cpu, seg, (uint16_t)(off + 0x0A), 0);        /* no capabilities */
+        mem_write16(cpu, seg, (uint16_t)(off + 0x0C), 0);
+        mem_write16(cpu, seg, (uint16_t)(off + 0x0E), (uint16_t)(off + 0x140));
+        mem_write16(cpu, seg, (uint16_t)(off + 0x10), seg);
+        mem_write16(cpu, seg, (uint16_t)(off + 0x12), VESA_VRAM_64K);
+        vesa_str(cpu, seg, (uint16_t)(off + 0x100), "El-Fish Recomp");
+        mem_write16(cpu, seg, (uint16_t)(off + 0x140), VESA_MODE);
+        mem_write16(cpu, seg, (uint16_t)(off + 0x142), 0xFFFF);  /* end of list */
+        cpu->ax = 0x004F;
+        break;
+    }
+    case 0x01: {   /* get mode info for CX -> 256-byte ModeInfoBlock at ES:DI */
+        if ((cpu->cx & 0x7FFF) != VESA_MODE) { cpu->ax = 0x014F; break; }
+        for (uint16_t i = 0; i < 256; i++) mem_write8(cpu, seg, (uint16_t)(off + i), 0);
+        /* supported | colour | graphics | BIOS-supported output */
+        mem_write16(cpu, seg, (uint16_t)(off + 0x00), 0x001B);
+        mem_write8(cpu, seg, (uint16_t)(off + 0x02), 0x07);      /* window A: exists/read/write */
+        mem_write8(cpu, seg, (uint16_t)(off + 0x03), 0x00);      /* window B: none */
+        mem_write16(cpu, seg, (uint16_t)(off + 0x04), 64);       /* granularity, KB */
+        mem_write16(cpu, seg, (uint16_t)(off + 0x06), 64);       /* window size, KB */
+        mem_write16(cpu, seg, (uint16_t)(off + 0x08), 0xA000);
+        mem_write16(cpu, seg, (uint16_t)(off + 0x0A), 0);
+        mem_write16(cpu, seg, (uint16_t)(off + 0x0C), 0);        /* no direct window func */
+        mem_write16(cpu, seg, (uint16_t)(off + 0x0E), 0);
+        mem_write16(cpu, seg, (uint16_t)(off + 0x10), VESA_WIDTH);
+        mem_write16(cpu, seg, (uint16_t)(off + 0x12), VESA_WIDTH);
+        mem_write16(cpu, seg, (uint16_t)(off + 0x14), VESA_HEIGHT);
+        mem_write8(cpu, seg, (uint16_t)(off + 0x16), 8);         /* char cell */
+        mem_write8(cpu, seg, (uint16_t)(off + 0x17), 16);
+        mem_write8(cpu, seg, (uint16_t)(off + 0x18), 1);         /* planes */
+        mem_write8(cpu, seg, (uint16_t)(off + 0x19), 8);         /* bits per pixel */
+        mem_write8(cpu, seg, (uint16_t)(off + 0x1A), 1);         /* banks */
+        mem_write8(cpu, seg, (uint16_t)(off + 0x1B), 4);         /* packed pixel */
+        mem_write8(cpu, seg, (uint16_t)(off + 0x1C), 0);         /* bank size */
+        mem_write8(cpu, seg, (uint16_t)(off + 0x1D), 0);         /* image pages */
+        cpu->ax = 0x004F;
+        break;
+    }
+    case 0x02:     /* set mode BX */
+        cpu->ax = ((cpu->bx & 0x7FFF) == VESA_MODE) ? 0x004F : 0x014F;
+        break;
+    case 0x03:     /* get current mode */
+        cpu->bx = VESA_MODE;
+        cpu->ax = 0x004F;
+        break;
+    case 0x07:     /* set/get display start: BH=0 set, BH=1 get; CX=pixel, DX=scanline */
+        if (cpu->bh == 1) { cpu->cx = g_vesa_start_x; cpu->dx = g_vesa_start_y; }
+        else { g_vesa_start_x = cpu->cx; g_vesa_start_y = cpu->dx; }
+        cpu->ax = 0x004F;
+        break;
+    case 0x05:     /* window control: BH=0 set / 1 get, BL=window, DX=position */
+        if (cpu->bh == 1) cpu->dx = g_vesa_bank;
+        else g_vesa_bank = cpu->dx;
+        cpu->ax = 0x004F;
+        break;
+    default:
+        TRACE("VESA %02X unimplemented\n", cpu->al);
+        cpu->ax = 0x014F;   /* call failed */
+        break;
+    }
+}
+
 /* ---- Video BIOS (INT 10h) ----
  * Text-mode queries only, so the C runtime can place its console output. The
  * graphics modes go to SDL later; until then a mode set is accepted and
@@ -297,6 +391,7 @@ void bios_int10(CPU *cpu)
     case 0x12:  /* get EGA/VGA configuration */
         if (cpu->bl == 0x10) { cpu->bh = 0; cpu->bl = 3; cpu->cx = 0x0009; }
         break;
+    case 0x4F:  vesa(cpu); break;   /* VESA super-VGA extensions */
     case 0x1A:  /* get display combination code -> VGA + colour monitor */
         cpu->al = 0x1A; cpu->bx = 0x0008;
         break;
@@ -439,11 +534,61 @@ void tsx_huge_alloc(CPU *cpu) {
     cpu->sp += 4;
 }
 void tsx_huge_free(CPU *cpu) {
-    TRACE("tsx_huge_free ax=%04X si=%04X\n", cpu->ax, cpu->si);
-    cpu_free_selector(cpu, cpu->ax);
+    TRACE("tsx_huge_free ds=%04X si=%04X\n", cpu->ds, cpu->si);
+    /* Callers pass the block as DS:SI with the paragraph count in AX; one passes
+     * the selector in SI instead. Both are safe -- cpu_free_selector ignores
+     * anything that is not a live dynamic selector. */
+    cpu_free_selector(cpu, cpu->ds);
     cpu_free_selector(cpu, cpu->si);
     cpu->sp += 4;
 }
-TSX_STUB(tsx_file_create)
+/* TSXLIB ordinal 72 is DPMI "simulate real-mode interrupt", not a file create --
+ * the ordinal map guessed wrong. It is how everything in this program reaches
+ * the BIOS from protected mode. On entry DS:BX is a DPMI real-mode call
+ * structure the caller has already filled in, AL is the interrupt number and CL
+ * the DPMI flags -- the wrapper pops both off the stack into registers before
+ * calling, so this is a plain RETF.
+ *
+ * Offsets are the DPMI ones: EDI 0x00, ESI 0x04, EBP 0x08, EBX 0x10, EDX 0x14,
+ * ECX 0x18, EAX 0x1C, flags 0x20, ES 0x22, DS 0x24. DS and BX have to survive,
+ * because the caller copies the results back out through them. */
+void tsx_dpmi_int(CPU *cpu) {
+    uint16_t intno = cpu->al;
+    uint16_t sel = cpu->ds, rm = cpu->bx;
+    TRACE("tsx_dpmi_int %02X ax=%04X\n", intno, mem_read16(cpu, sel, (uint16_t)(rm + 0x1C)));
+
+    cpu->di = mem_read16(cpu, sel, (uint16_t)(rm + 0x00));
+    cpu->si = mem_read16(cpu, sel, (uint16_t)(rm + 0x04));
+    cpu->bp = mem_read16(cpu, sel, (uint16_t)(rm + 0x08));
+    cpu->bx = mem_read16(cpu, sel, (uint16_t)(rm + 0x10));
+    cpu->dx = mem_read16(cpu, sel, (uint16_t)(rm + 0x14));
+    cpu->cx = mem_read16(cpu, sel, (uint16_t)(rm + 0x18));
+    cpu->ax = mem_read16(cpu, sel, (uint16_t)(rm + 0x1C));
+    cpu->es = mem_read16(cpu, sel, (uint16_t)(rm + 0x22));
+    cpu->ds = mem_read16(cpu, sel, (uint16_t)(rm + 0x24));
+
+    switch (intno) {
+    case 0x21: dos_int21(cpu);   break;
+    case 0x10: bios_int10(cpu);  break;
+    case 0x16: bios_int16(cpu);  break;
+    case 0x33: mouse_int33(cpu); break;
+    default:   int_handler(cpu, intno); break;
+    }
+
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x00), cpu->di);
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x04), cpu->si);
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x08), cpu->bp);
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x10), cpu->bx);
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x14), cpu->dx);
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x18), cpu->cx);
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x1C), cpu->ax);
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x20), cpu->flags);
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x22), cpu->es);
+    mem_write16(cpu, sel, (uint16_t)(rm + 0x24), cpu->ds);
+
+    cpu->ds = sel;
+    cpu->bx = rm;
+    cpu->sp += 4;   /* plain RETF -- the caller popped its own two words */
+}
 TSX_STUB(tsx_file_write)
 TSX_STUB(tsx_file_seek)
