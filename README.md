@@ -2,24 +2,29 @@
 
 Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Windows 11.
 
-## Project Status: Runs, and draws its title screen
+## Project Status: Runs, and reaches its main menu
 
-![El-Fish title screen, rendered by the recompiled executable](docs/title-screen.png)
+![El-Fish main menu, rendered by the recompiled executable](docs/main-menu.png)
 
 That is the recompiled `ELFISH.EXE` running as a native Windows program: 640x400x256
 through a VESA banked framebuffer, the palette uploaded through the DAC ports, drawn
 by the game's own lifted code. No emulator, no DOSBox.
 
-Startup runs **1,938 distinct functions** deep and ends in the game's keyboard/timer
-poll loop, waiting for input. On the way it loads `ELFISH.RED`, reads and rewrites
-`ELFISH.INS`, probes the DOS file-handle limit, initialises the mouse, detects VESA,
-sets mode 0x100, and loads `XX_MDR.DLL` and `\SYSTEM\EPICTURE.DBP`.
+Startup runs **2,103 distinct functions** deep -- through the title screen and into
+the main menu -- and settles in the game's keyboard/timer poll loop, waiting for
+input. On the way it loads `ELFISH.RED`, reads and rewrites `ELFISH.INS`, validates
+the data directories it names, probes the DOS file-handle limit, initialises the
+mouse, detects VESA, sets mode 0x100, and loads `XX_MDR.DLL`, `\SYSTEM\EPICTURE.DBP`
+and the title artwork.
+
+The red panel over the middle of the menu is not yet understood; it is drawn by the
+game, not by us, and it is where a preview should be.
 
 Capture a frame yourself:
 
 ```bash
-ELFISH_DUMP_FB=title.ppm build/elfish_test.exe
-python tools/ppm2png.py title.ppm title.png
+ELFISH_DUMP_FB=menu.ppm build/elfish_test.exe
+python tools/ppm2png.py menu.ppm menu.png
 ```
 
 ### What's Done
@@ -42,6 +47,7 @@ python tools/ppm2png.py title.ppm title.png
 |-------|-------|---------------|
 | **x87 instructions dropped** | **17,355** | The decoder names only 1,574 of the FPU ops; the rest come out as `esc_N` and are lifted to a comment. Segments 225/228-231 are the fish genetics and rendering engine, so almost none of the actual simulation runs yet. Biggest single gap. |
 | No display or input yet | — | The framebuffer is real memory and can be dumped; it needs an SDL2 window, and the keyboard needs wiring to it |
+| Red panel on the main menu | 1 | Drawn by the game where a preview should be; not an error dialog (the message-box routine is not called) |
 | Sound | — | Not started: AdLib/SB/MT-32 via `XX_MDR*.DLL` |
 | Unresolved call targets | 96 | Emitted as stubs that do nothing but clean up the caller's stack frame |
 | Dropped out-of-function branches | 42 | Targets that are not instruction boundaries, almost all inside FPU-emulation trampolines |
@@ -134,8 +140,8 @@ cmake --build .
    comment, which is most of the maths in the fish engine. Nothing simulates until this does.
 2. **SDL2 window** for the framebuffer that already exists, and route its keyboard and
    mouse into the INT 16h/33h handlers.
-3. Work through the title screen: the dialog box draws but its text does not — INT 10h
-   AH=11 (get font pointer) has nothing to point at yet.
+3. Work out the red panel on the main menu, and drive the UI: the game is sitting in
+   its poll loop, so the next real test is feeding it a keypress and a mouse click.
 4. The `XX_MDR*.DLL` driver system, which the game opens but we do not load.
 5. Sound.
 

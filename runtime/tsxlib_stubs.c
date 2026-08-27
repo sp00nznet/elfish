@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <conio.h>
 #include <windows.h>
@@ -50,24 +51,44 @@ static void map_path(const char *dos, char *out, int max) {
     for (char *q = out; *q; q++) if (*q == '\\') *q = '/';
 }
 
-/* Open a guest file case-insensitively (DOS is case-insensitive; host may not).
- * Tries the mapped path, then all-lower and all-upper of the final component. */
-static FILE *host_open(const char *dos, const char *mode) {
-    char path[512];
-    map_path(dos, path, sizeof(path));
-    FILE *f = fopen(path, mode);
-    if (f) return f;
-    char *slash = strrchr(path, '/');
-    char *name = slash ? slash + 1 : path;
+/* Resolve a guest path onto the host, case-insensitively (DOS does not care;
+ * the host might). Tries the mapped path, then all-lower and all-upper of the
+ * final component. Returns 1 if something is there, with `out` left holding the
+ * spelling that worked and `attr` the DOS attribute byte. */
+static int host_resolve(const char *dos, char *out, int max, unsigned *attr) {
     char save[256];
+    map_path(dos, out, max);
+    char *slash = strrchr(out, '/');
+    char *name = slash ? slash + 1 : out;
     snprintf(save, sizeof(save), "%s", name);
-    for (char *q = name; *q; q++) *q = (char)tolower((unsigned char)*q);
-    if ((f = fopen(path, mode))) return f;
-    snprintf(name, sizeof(save), "%s", save);
-    for (char *q = name; *q; q++) *q = (char)toupper((unsigned char)*q);
-    return fopen(path, mode);
+    for (int pass = 0; pass < 3; pass++) {
+        if (pass == 1)
+            for (char *q = name; *q; q++) *q = (char)tolower((unsigned char)*q);
+        else if (pass == 2)
+            for (char *q = name; *q; q++) *q = (char)toupper((unsigned char)*q);
+        struct stat st;
+        if (stat(out, &st) == 0) {
+            /* A directory has to be reported as one. The game validates the data
+             * directories named in ELFISH.RED by asking for their attributes, and
+             * fopen cannot answer for a directory -- reporting \FISH missing put
+             * an "Incorrect RED/Subdir" box on the title screen. */
+            if (attr) *attr = (st.st_mode & S_IFDIR) ? 0x10u : 0x20u;
+            return 1;
+        }
+        snprintf(name, sizeof(save), "%s", save);
+    }
+    return 0;
 }
 
+/* Open a guest file, resolving its name the same way. */
+static FILE *host_open(const char *dos, const char *mode) {
+    char path[512];
+    if (host_resolve(dos, path, sizeof(path), NULL))
+        return fopen(path, mode);
+    /* Not there yet -- a create still has to work. */
+    map_path(dos, path, sizeof(path));
+    return fopen(path, mode);
+}
 /* Allocate a DOS handle (>=5) for a host FILE*. Returns 0xFFFF if full. */
 static uint16_t dos_handle_alloc(CPU *cpu, FILE *f) {
     for (int h = 5; h < 256; h++) {
@@ -252,20 +273,19 @@ void dos_int21(CPU *cpu)
         break;
     }
     case 0x43: {  /* get/set file attributes: DS:DX=name, AL=0 get -> CX=attr */
-        char name[256]; read_asciiz(cpu, cpu->ds, cpu->dx, name, sizeof(name));
-        FILE *f = host_open(name, "rb");
+        char name[256], path[512]; unsigned attr = 0;
+        read_asciiz(cpu, cpu->ds, cpu->dx, name, sizeof(name));
+        int ok = host_resolve(name, path, sizeof(path), &attr);
         TRACE("INT21 attr-%s '%s' -> %s\n", cpu->al ? "set" : "get", name,
-              f ? "exists" : "MISSING");
-        if (f) fclose(f);
-        if (!f) { cpu->flags |= FLAG_CF; cpu->ax = 2; }   /* file not found */
-        else { cpu->cx = 0x20; cpu->flags &= ~FLAG_CF; }  /* archive bit */
+              ok ? (attr == 0x10u ? "dir" : "file") : "MISSING");
+        if (!ok) { cpu->flags |= FLAG_CF; cpu->ax = 2; }   /* file not found */
+        else { cpu->cx = (uint16_t)attr; cpu->flags &= ~FLAG_CF; }
         break;
     }
     case 0x36:  /* get free disk space: DL=drive -> AX=sectors/cluster,
                  * BX=free clusters, CX=bytes/sector, DX=total clusters.
-                 * Report a roomy but ordinary FAT volume: 512-byte sectors,
-                 * 8 sectors per cluster, ~1GB of it free. The game only wants
-                 * to know whether there is room to write a tank. */
+                 * An ordinary roomy FAT volume; the game only wants to know
+                 * whether there is room to write a tank. */
         cpu->ax = 8;
         cpu->cx = 512;
         cpu->dx = 0xFFFF;
@@ -609,8 +629,9 @@ void bios_int16(CPU *cpu)
 {
     /* The program sits in this poll loop once it is up, and never returns to
      * main, so this is where a framebuffer dump can actually be taken. */
-    { static long polls; const char *fb;
-      if (++polls == 20000 && (fb = getenv("ELFISH_DUMP_FB"))) elfish_dump_framebuffer(cpu, fb); }
+    { static long polls; const char *fb = getenv("ELFISH_DUMP_FB");
+      const char *at = getenv("ELFISH_DUMP_AT");
+      if (fb && ++polls == (at ? atol(at) : 20000)) elfish_dump_framebuffer(cpu, fb); }
     TRACE("INT16 ah=%02X\n", cpu->ah);
     switch (cpu->ah) {
     case 0x00: case 0x10: {  /* wait for a key, remove it from the buffer */
