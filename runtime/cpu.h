@@ -151,8 +151,7 @@ static inline uint8_t mem_read8(CPU *cpu, uint16_t seg, uint16_t off) {
 #ifdef ELFISH_TRACE_FN
 extern uint32_t g_watch_seg, g_watch_lo, g_watch_hi;
 void watch_write(CPU *cpu, uint16_t seg, uint16_t off, uint32_t val, int size);
-void watch_hist(uint16_t seg);
-#define WATCH(c, s, o, v, n) do { watch_hist(s); if ((s) == g_watch_seg) watch_write(c, s, o, v, n); } while (0)
+#define WATCH(c, s, o, v, n) do { if ((s) == g_watch_seg) watch_write(c, s, o, v, n); } while (0)
 #else
 #define WATCH(c, s, o, v, n) ((void)0)
 #endif

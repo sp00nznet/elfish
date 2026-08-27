@@ -2,37 +2,49 @@
 
 Static recompilation of **El-Fish** (1993, AnimaTek/Maxis, DOS) v1.01 for Windows 11.
 
-## Project Status: Executes Startup Code
+## Project Status: Runs, and draws its title screen
 
-The full lifted codebase **compiles, links (zero undefined symbols), and runs**: it loads a
-flat memory image, calls the NE entry point, flows across segments
-(`seg122 → seg209_0196 → seg209_0306`), issues a DOS `INT 21h` call, and returns without
-faulting. Focus is now on **runtime services** so startup can proceed into the game.
+![El-Fish title screen, rendered by the recompiled executable](docs/title-screen.png)
+
+That is the recompiled `ELFISH.EXE` running as a native Windows program: 640x400x256
+through a VESA banked framebuffer, the palette uploaded through the DAC ports, drawn
+by the game's own lifted code. No emulator, no DOSBox.
+
+Startup runs **1,938 distinct functions** deep and ends in the game's keyboard/timer
+poll loop, waiting for input. On the way it loads `ELFISH.RED`, reads and rewrites
+`ELFISH.INS`, probes the DOS file-handle limit, initialises the mouse, detects VESA,
+sets mode 0x100, and loads `XX_MDR.DLL` and `\SYSTEM\EPICTURE.DBP`.
+
+Capture a frame yourself:
+
+```bash
+ELFISH_DUMP_FB=title.ppm build/elfish_test.exe
+python tools/ppm2png.py title.ppm title.png
+```
 
 ### What's Done
-- Game files fully extracted (`game/ELFISH/` directory tree)
-- Main executable (`ELFISH.EXE`) identified as **NE (New Executable)** format
-- Built complete NE analysis and lifting toolchain (8 tools)
-- Program architecture mapped — core math engine, UI/logic, system layer identified
-- **All 121 code segments lifted to C** — **2,236 functions**, ~**196K lines** in `src/`
-- **Relocation chaining fixed** — far-call resolution went from 4,966 unresolved to **2** (99.96%)
-- **IDA-driven disassembly** — IDA Professional 9.1 (idalib, headless) exports accurate
-  function boundaries + instruction heads (`analysis/ida_funcs.json`); the decoder syncs to
-  these, cutting unaligned NO-OP stubs from **819 → 26** (96.8%)
-- **Cross-segment entry-point seeding** — function detection seeds from prologues + near-call
-  targets + far-call targets + IDA functions, so call destinations become real functions
-- Runtime: `cpu.h` (CPU + FPU state), `runtime_api.h` (interrupt + TSXLIB ordinal decls),
-  `tsxlib_stubs.c` (all 33 ordinals + interrupt handlers stubbed), auto-generated `segments.h`
-- CMake/Ninja build → `libelfish_segments.a` + `libelfish_runtime.a` + `elfish_test.exe`,
-  verified link-clean (whole-archive, 0 undefined symbols)
+- All 121 code segments lifted to C — **15,213 functions**, ~**299K lines** in `src/`
+- Relocations resolved, including the **additive** ones whose addend selects an entry
+  of a multi-entry thunk (268 sites that otherwise land on the wrong function)
+- **IDA-driven disassembly** (`analysis/ida_funcs.json`) reconciled against relocations,
+  branch targets and code pointers, which are ground truth about instruction boundaries
+- DOS services: file I/O, directory and attribute calls, time/date, free space
+- TSXLIB: memory alloc/free with real reclaim, `int86x` (ordinal 32) and DPMI
+  simulate-real-mode-interrupt (ordinal 72)
+- BIOS: INT 10h text and palette calls, VBE 1.2 (one mode, banked window), INT 16h
+  keyboard against the host console, INT 33h mouse
+- A VGA register file — CRTC, sequencer, graphics, attribute, DAC — that reads back
+  what was written, because the driver checks
+- CMake/Ninja build → `elfish_test.exe`, link-clean
 
-### Remaining Work (correctness, prioritized)
+### Remaining Work (prioritized)
 | Issue | Count | Status / Plan |
 |-------|-------|---------------|
-| Runtime services are no-ops | — | **Next.** Startup reaches DOS `INT 21h AH=51h` then early-exits; implement TSXLIB mem/file + DOS/BIOS services so init proceeds |
-| Dropped opcodes (`rcr`/`rcl` + others) | ~300 | Emitted as TODO comments; implement in `lift16.py` |
-| Indirect far calls/jumps | ~200 | `call/jmp far [mem]` function-pointer dispatch, unhandled |
-| Unaligned NO-OP stubs (residual) | 26 | Bogus far-call targets past segment end / IDA-classified data — no-op is correct |
+| **x87 instructions dropped** | **17,355** | The decoder names only 1,574 of the FPU ops; the rest come out as `esc_N` and are lifted to a comment. Segments 225/228-231 are the fish genetics and rendering engine, so almost none of the actual simulation runs yet. Biggest single gap. |
+| No display or input yet | — | The framebuffer is real memory and can be dumped; it needs an SDL2 window, and the keyboard needs wiring to it |
+| Sound | — | Not started: AdLib/SB/MT-32 via `XX_MDR*.DLL` |
+| Unresolved call targets | 96 | Emitted as stubs that do nothing but clean up the caller's stack frame |
+| Dropped out-of-function branches | 42 | Targets that are not instruction boundaries, almost all inside FPU-emulation trampolines |
 
 **Memory model:** selectors are normalized to NE segment indices; `gen_image.py` builds a flat
 image (`build_data/mem_image.bin`) placing each segment at `SEG_SEGMENT_BASE[n]` with all 12,320
@@ -102,10 +114,11 @@ Only 12 of 121 code segments directly call TSXLIB — the system layer is thin a
 
 | Metric | Value |
 |--------|-------|
-| Source files | 121 (one per code segment) |
-| Functions | 1,544 (1,501 with prototypes) |
-| Lines of C | 110,174 |
-| FPU memory ops resolved | 3,299 / 3,401 (97%) |
+| Source files | 121 (one per code segment) + generated dispatch/stubs |
+| Functions | 15,213 real, 96 unresolved stubs |
+| Lines of C | 299,380 |
+| x87 instructions lifted | 1,574 of 18,929 (the rest decode as `esc_N`) |
+| Unique functions reached at runtime | 1,938 |
 | Lifting errors | 0 |
 
 ### Building
@@ -117,13 +130,14 @@ cmake --build .
 ```
 
 ### What's Next
-1. **Fix relocation chaining** in `ne_parse.py` — walk linked lists through segment data to capture all fixup offsets (~2,391 unresolved far calls)
-2. **Re-lift all segments** with fixed relocations
-3. Handle indirect far calls (195), data-in-code (705), and boundary misses (140)
-4. Implement TSXLIB runtime stubs (memory alloc, file I/O, DOS compat)
-5. Extract and load NE data segments into flat memory
-6. Add SDL2 platform layer for video output and input
-7. Test execution starting from entry point (seg 122 → seg 209)
+1. **Decode the remaining x87 instructions.** 17,355 come out as `esc_N` and lift to a
+   comment, which is most of the maths in the fish engine. Nothing simulates until this does.
+2. **SDL2 window** for the framebuffer that already exists, and route its keyboard and
+   mouse into the INT 16h/33h handlers.
+3. Work through the title screen: the dialog box draws but its text does not — INT 10h
+   AH=11 (get font pointer) has nothing to point at yet.
+4. The `XX_MDR*.DLL` driver system, which the game opens but we do not load.
+5. Sound.
 
 ### Other Executables
 
@@ -158,6 +172,7 @@ tools/
   fpu_decode.py — Full x87 FPU instruction decoder
   tsxlib.py    — TSXLIB ordinal-to-C function mapping
   ne_xref.py   — Cross-reference and call graph builder
+  ppm2png.py   — Framebuffer dump (PPM) -> PNG, stdlib only
 analysis/      — Generated analysis outputs
 CMakeLists.txt — Build system
 ```
