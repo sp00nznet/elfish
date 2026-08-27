@@ -82,15 +82,21 @@ static uint16_t dos_handle_alloc(CPU *cpu, FILE *f) {
 #define TRACE(...) ((void)0)
 #endif
 
-/* Function tracing (-DELFISH_TRACE_FN) starts off and arms on the first INT21
- * call whose AH matches ELFISH_TRACE_FROM (hex). Without a trigger the trace is
- * buried under the millions of iterations of the calibrated delay loop that
- * runs before anything interesting. Unset = never; "00" = from the start. */
+/* Function tracing (-DELFISH_TRACE_FN) starts off and arms on an INT21 call
+ * named by ELFISH_TRACE_FROM as "<AH hex>" or "<AH hex>:<Nth occurrence>".
+ * Without a trigger the trace is buried under the tens of millions of
+ * iterations of the calibrated delay loop that runs before anything
+ * interesting. Unset = never; "00" = from the start. */
 int g_trace_on = 0;
 
 static void trace_arm(uint8_t ah) {
+    static int seen = 0;
     const char *from = getenv("ELFISH_TRACE_FROM");
-    if (from && ah == (uint8_t)strtol(from, NULL, 16)) g_trace_on = 1;
+    if (g_trace_on || !from) return;
+    char *end;
+    if (ah != (uint8_t)strtol(from, &end, 16)) return;
+    long nth = (*end == ':') ? strtol(end + 1, NULL, 10) : 1;
+    if (++seen >= nth) g_trace_on = 1;
 }
 
 /* A zero divisor would be undefined behaviour in C; report it and carry on. */
@@ -242,7 +248,33 @@ void dos_int21(CPU *cpu)
         break;
     }
 }
-void bios_int10(CPU *cpu)  { TRACE("INT10 ah=%02X\n", cpu->ah); (void)cpu; }
+/* ---- Video BIOS (INT 10h) ----
+ * Text-mode queries only, so the C runtime can place its console output. The
+ * graphics modes go to SDL later; until then a mode set is accepted and
+ * ignored rather than reported as failed. */
+void bios_int10(CPU *cpu)
+{
+    TRACE("INT10 ah=%02X al=%02X\n", cpu->ah, cpu->al);
+    switch (cpu->ah) {
+    case 0x03:  /* get cursor position and size: BH=page */
+        cpu->cx = 0x0607;   /* a normal underline cursor for an 8-line cell */
+        cpu->dx = 0;        /* DH=row, DL=column -- top left */
+        break;
+    case 0x0F:  /* get video mode -> AL=mode, AH=columns, BH=page */
+        cpu->al = 0x03;     /* 80x25 colour text */
+        cpu->ah = 80;
+        cpu->bh = 0;
+        break;
+    case 0x12:  /* get EGA/VGA configuration */
+        if (cpu->bl == 0x10) { cpu->bh = 0; cpu->bl = 3; cpu->cx = 0x0009; }
+        break;
+    case 0x1A:  /* get display combination code -> VGA + colour monitor */
+        cpu->al = 0x1A; cpu->bx = 0x0008;
+        break;
+    default:
+        break;      /* mode sets, cursor moves, scrolls: accepted, no display yet */
+    }
+}
 /* ---- Keyboard (INT 16h) ----
  * Backed by the host console via conio, so the DOS-era text prompts are
  * really interactive. When stdin is not a console _kbhit() just reports no
@@ -309,7 +341,25 @@ TSX_STUB(tsx_seg_jmp)
 TSX_STUB(tsx_seg_ref)
 TSX_STUB(tsx_seg_fixup_call)
 TSX_STUB(tsx_seg_fixup_jmp)
-TSX_STUB(tsx_dos_call)
+/* TSXLIB ordinal 32 is the extender's software-interrupt gateway -- int86x(),
+ * not a DOS-only call despite the name. The interrupt number is pushed as a
+ * word argument and the routine returns with RETF 2, consuming it; the C
+ * runtime's intdos()/int86x() (seg209_12E5) relies on that to get its own BP
+ * back off the stack, so the 2 extra bytes are load-bearing, not bookkeeping.
+ * The register set is already loaded from the caller's REGS struct on entry
+ * and is copied back out afterwards. */
+void tsx_dos_call(CPU *cpu) {
+    uint16_t intno = mem_read16(cpu, cpu->ss, (uint16_t)(cpu->sp + 4));
+    TRACE("tsx_dos_call int %02X ax=%04X\n", intno, cpu->ax);
+    switch (intno) {
+    case 0x21: dos_int21(cpu);   break;
+    case 0x10: bios_int10(cpu);  break;
+    case 0x16: bios_int16(cpu);  break;
+    case 0x33: mouse_int33(cpu); break;
+    default:   int_handler(cpu, intno); break;
+    }
+    cpu->sp += 6;   /* RETF 2 */
+}
 TSX_STUB(tsx_file_getinfo)
 TSX_STUB(tsx_file_read)
 TSX_STUB(tsx_file_close)
