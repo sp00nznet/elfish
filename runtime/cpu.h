@@ -21,6 +21,7 @@
 #include <math.h>
 #include "mem_layout.h"
 
+#define ELFISH_VESA_WINDOW 0x10000u  /* the 64KB VBE window at selector 0xFFFF */
 #define ELFISH_MAX_FREE 8192u   /* freed blocks / selectors tracked at once */
 
 /* ── Function-entry trace (opt-in: compile with -DELFISH_TRACE_FN) ── */
@@ -150,7 +151,8 @@ static inline uint8_t mem_read8(CPU *cpu, uint16_t seg, uint16_t off) {
 #ifdef ELFISH_TRACE_FN
 extern uint32_t g_watch_seg, g_watch_lo, g_watch_hi;
 void watch_write(CPU *cpu, uint16_t seg, uint16_t off, uint32_t val, int size);
-#define WATCH(c, s, o, v, n) do { if ((s) == g_watch_seg) watch_write(c, s, o, v, n); } while (0)
+void watch_hist(uint16_t seg);
+#define WATCH(c, s, o, v, n) do { watch_hist(s); if ((s) == g_watch_seg) watch_write(c, s, o, v, n); } while (0)
 #else
 #define WATCH(c, s, o, v, n) ((void)0)
 #endif
@@ -161,8 +163,9 @@ static inline void mem_write8(CPU *cpu, uint16_t seg, uint16_t off, uint8_t val)
 }
 
 static inline uint16_t mem_read16(CPU *cpu, uint16_t seg, uint16_t off) {
-    /* Absolute/BIOS-data selector 0xFFFF: emulate the 0040:006C timer tick so
-     * the game's timer wait and speed-calibration loops terminate. */
+    /* Selector 0xFFFF is the BIOS data area here: emulate the 0040:006C tick so
+     * the timer waits and speed calibration terminate. Still load-bearing --
+     * without it execution stops after 65 functions. */
     if (seg == 0xFFFF) {
         if (off == 0x6C) return (uint16_t)(cpu->bios_ticks++);
         if (off == 0x6E) return (uint16_t)(cpu->bios_ticks >> 16);
@@ -477,7 +480,13 @@ static inline int cpu_alloc_mem(CPU *cpu, uint32_t size) {
         cpu->sel_base[s] = SEG_SEGMENT_BASE[s];
     /* Dynamic heap lives past the loaded image; selectors start well above the
      * NE range to avoid colliding with raw/hardcoded selectors. */
+    /* The video driver programs its banked VESA window through selector 0xFFFF,
+     * so give that real backing at the bottom of the heap instead of letting it
+     * fall into the guard region -- it is where every pixel the game draws goes.
+     * ELFISH_VESA_WINDOW bytes, one 64KB VBE window. */
     cpu->heap_next = (ELFISH_IMAGE_SIZE + 0xFu) & ~0xFu;
+    cpu->sel_base[0xFFFF] = cpu->heap_next;
+    cpu->heap_next += ELFISH_VESA_WINDOW;
     cpu->heap_end = size;
     cpu->next_sel = 0x4000;
     return 1;

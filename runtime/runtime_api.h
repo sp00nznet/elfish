@@ -23,6 +23,12 @@ void dispatch_near(CPU *cpu, uint16_t seg, uint16_t off);
  * handler and depends on it. */
 void catz_div0(const char *op);
 
+/* ---- Video ----
+ * The extender must publish a framebuffer selector before the driver looks for
+ * one; elfish_video_init does that and sets up the banked VESA window. */
+void elfish_video_init(CPU *cpu);
+void elfish_dump_framebuffer(CPU *cpu, const char *path);
+
 /* ---- Software interrupts ---- */
 void dos_int21(CPU *cpu);
 void bios_int10(CPU *cpu);

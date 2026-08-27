@@ -96,6 +96,19 @@ const char *g_cur_fn = "?";
 /* No segment is 0xFFFFFFFF, so an unset watch never matches. */
 uint32_t g_watch_seg = 0xFFFFFFFFu, g_watch_lo = 0, g_watch_hi = 0;
 
+/* Temporary: count writes per selector to find the framebuffer. */
+static unsigned long g_wr[65536];
+void watch_hist(uint16_t seg) { g_wr[seg]++; }
+void watch_dump(void) {
+    for (int i = 0; i < 20; i++) {
+        unsigned long best = 0; int bi = -1;
+        for (int s = 0; s < 65536; s++) if (g_wr[s] > best) { best = g_wr[s]; bi = s; }
+        if (bi < 0) break;
+        fprintf(stderr, "WRITES sel=%04X count=%lu\n", bi, best);
+        g_wr[bi] = 0;
+    }
+}
+
 void watch_write(CPU *cpu, uint16_t seg, uint16_t off, uint32_t val, int size) {
     if (off + (uint32_t)size <= g_watch_lo || off >= g_watch_hi) return;
     fprintf(stderr, "WATCH %04X:%04X <- %0*X (%d) in %-16s ds:si=%04X:%04X es:di=%04X:%04X cx=%04X ax=%04X bx=%04X\n",
@@ -261,6 +274,16 @@ void dos_int21(CPU *cpu)
         else { cpu->cx = 0x20; cpu->flags &= ~FLAG_CF; }  /* archive bit */
         break;
     }
+    case 0x36:  /* get free disk space: DL=drive -> AX=sectors/cluster,
+                 * BX=free clusters, CX=bytes/sector, DX=total clusters.
+                 * Report a roomy but ordinary FAT volume: 512-byte sectors,
+                 * 8 sectors per cluster, ~1GB of it free. The game only wants
+                 * to know whether there is room to write a tank. */
+        cpu->ax = 8;
+        cpu->cx = 512;
+        cpu->dx = 0xFFFF;
+        cpu->bx = 0xFFF0;
+        break;
     case 0x44:  /* IOCTL: AL=0 get device info for handle in BX */
         if (cpu->al == 0) {
             /* handles 0/1/2 are character devices (bit 7 set); files clear it */
@@ -357,6 +380,78 @@ uint8_t port_in8(CPU *cpu, uint16_t port) {
     }
 }
 
+/* The one mode we advertise: VBE 0x100, 640x400x256 in a banked window. */
+#define VESA_MODE      0x0100u
+#define VESA_WIDTH     640u
+#define VESA_HEIGHT    400u
+#define VESA_VRAM_64K  16u        /* 1 MB, in 64KB units */
+
+/* ---- Video memory ----
+ * The driver takes its framebuffer selector from seg29:[0x13], which the DOS
+ * extender is supposed to fill with a selector mapping the VESA window. Ours
+ * never did, so the slot kept the 0xFFFF it is initialised to -- and 0xFFFF is
+ * also the BIOS-data selector the timer tick is read through, so every pixel
+ * the game drew landed on top of it. Publishing a real selector is the
+ * extender's job, and here we are the extender.
+ *
+ * VBE 1.2 has no linear framebuffer: the guest sees one 64KB window and moves
+ * it with 4F05. Keep the whole of video memory behind it and swap the window
+ * on each bank change, so what the guest draws accumulates into one image.
+ * ponytail: copy in and out on every bank switch. Point the selector straight
+ * into the backing store if that ever shows up in a profile. */
+#define VRAM_BYTES (VESA_VRAM_64K * 0x10000u)
+
+static uint8_t *g_vram;
+static uint16_t g_fb_sel;
+static unsigned g_fb_bank;
+
+void elfish_video_init(CPU *cpu) {
+    g_vram = (uint8_t *)calloc(1, VRAM_BYTES);
+    g_fb_sel = cpu_alloc_selector(cpu, 0x10000u);
+    g_fb_bank = 0;
+    /* seg29:[0x13] is the video selector; [0x11] is a separate one. */
+    mem_write16(cpu, 29, 0x13, g_fb_sel);
+}
+
+/* Move the 64KB window to `bank`, carrying the guest's pixels with it. */
+static void vesa_set_bank(CPU *cpu, unsigned bank) {
+    if (!g_vram || !g_fb_sel) return;
+    uint8_t *win = cpu->mem + cpu->sel_base[g_fb_sel];
+    if (g_fb_bank < VESA_VRAM_64K)
+        memcpy(g_vram + g_fb_bank * 0x10000u, win, 0x10000u);
+    g_fb_bank = bank;
+    if (bank < VESA_VRAM_64K)
+        memcpy(win, g_vram + bank * 0x10000u, 0x10000u);
+}
+
+/* Write what the game has drawn so far as a PPM, colours through the DAC. */
+void elfish_dump_framebuffer(CPU *cpu, const char *path) {
+    if (!g_vram) return;
+    vesa_set_bank(cpu, g_fb_bank);      /* flush the live window first */
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    /* If nothing has set the palette yet, show the raw indices as grey rather
+     * than a black rectangle -- an unset palette should not look like an unset
+     * framebuffer. */
+    int dac_empty = 1;
+    for (unsigned i = 0; i < 768 && dac_empty; i++) if (g_dac[i]) dac_empty = 0;
+    fprintf(f, "P6\n%u %u\n255\n", VESA_WIDTH, VESA_HEIGHT);
+    for (unsigned i = 0; i < VESA_WIDTH * VESA_HEIGHT; i++) {
+        uint8_t c = g_vram[i];
+        if (dac_empty) { fputc(c, f); fputc(c, f); fputc(c, f); continue; }
+        /* The DAC holds 6-bit components, as VGA always has. */
+        fputc((int)(g_dac[c * 3 + 0] << 2), f);
+        fputc((int)(g_dac[c * 3 + 1] << 2), f);
+        fputc((int)(g_dac[c * 3 + 2] << 2), f);
+    }
+    fclose(f);
+    { unsigned nz = 0, dz = 0;
+      for (unsigned i = 0; i < VRAM_BYTES; i++) if (g_vram[i]) nz++;
+      for (unsigned i = 0; i < 768; i++) if (g_dac[i]) dz++;
+      fprintf(stderr, "wrote %s (%ux%u) nonzero pixels=%u, DAC entries set=%u, sel=%04X\n",
+              path, VESA_WIDTH, VESA_HEIGHT, nz, dz, g_fb_sel); }
+}
+
 /* ---- VESA / VBE 1.2 (INT 10h AX=4Fxx) ----
  * The game asks for mode 0x100, 640x400x256, through a banked 64KB window at
  * A000 -- the SVGA path its box advertises. Reporting one mode honestly is
@@ -365,11 +460,6 @@ uint8_t port_in8(CPU *cpu, uint16_t port) {
  * bit, because there is no VBE 2.0.
  * ponytail: the window is real memory and nothing displays it yet. Wiring it to
  * SDL is the next step; the shape of what the guest writes does not change. */
-#define VESA_MODE      0x0100u
-#define VESA_WIDTH     640u
-#define VESA_HEIGHT    400u
-#define VESA_VRAM_64K  16u        /* 1 MB, in 64KB units */
-
 static void vesa_str(CPU *cpu, uint16_t seg, uint16_t off, const char *s) {
     for (; *s; s++, off++) mem_write8(cpu, seg, off, (uint8_t)*s);
     mem_write8(cpu, seg, off, 0);
@@ -439,7 +529,7 @@ static void vesa(CPU *cpu) {
         break;
     case 0x05:     /* window control: BH=0 set / 1 get, BL=window, DX=position */
         if (cpu->bh == 1) cpu->dx = g_vesa_bank;
-        else g_vesa_bank = cpu->dx;
+        else { g_vesa_bank = cpu->dx; vesa_set_bank(cpu, cpu->dx); }
         cpu->ax = 0x004F;
         break;
     default:
@@ -465,6 +555,39 @@ void bios_int10(CPU *cpu)
         cpu->al = 0x03;     /* 80x25 colour text */
         cpu->ah = 80;
         cpu->bh = 0;
+        break;
+    case 0x10:  /* palette / DAC */
+        switch (cpu->al) {
+        case 0x10:  /* set one DAC register: BX=index, DH=r, CH=g, CL=b */
+            if (cpu->bx < 256) {
+                g_dac[cpu->bx * 3 + 0] = cpu->dh;
+                g_dac[cpu->bx * 3 + 1] = cpu->ch;
+                g_dac[cpu->bx * 3 + 2] = cpu->cl;
+            }
+            break;
+        case 0x12:  /* set a block: BX=first, CX=count, ES:DX=RGB triples */
+            for (uint16_t i = 0; i < cpu->cx && (uint32_t)cpu->bx + i < 256; i++)
+                for (int k = 0; k < 3; k++)
+                    g_dac[(cpu->bx + i) * 3 + k] =
+                        mem_read8(cpu, cpu->es, (uint16_t)(cpu->dx + i * 3 + k));
+            break;
+        case 0x15:  /* read one DAC register -> DH=r, CH=g, CL=b */
+            if (cpu->bx < 256) {
+                cpu->dh = g_dac[cpu->bx * 3 + 0];
+                cpu->ch = g_dac[cpu->bx * 3 + 1];
+                cpu->cl = g_dac[cpu->bx * 3 + 2];
+            }
+            break;
+        case 0x17:  /* read a block */
+            for (uint16_t i = 0; i < cpu->cx && (uint32_t)cpu->bx + i < 256; i++)
+                for (int k = 0; k < 3; k++)
+                    mem_write8(cpu, cpu->es, (uint16_t)(cpu->dx + i * 3 + k),
+                               g_dac[(cpu->bx + i) * 3 + k]);
+            break;
+        default:
+            TRACE("INT10 palette AL=%02X unimplemented\n", cpu->al);
+            break;
+        }
         break;
     case 0x12:  /* get EGA/VGA configuration */
         if (cpu->bl == 0x10) { cpu->bh = 0; cpu->bl = 3; cpu->cx = 0x0009; }
@@ -497,6 +620,10 @@ static int kb_poll(void) {
 
 void bios_int16(CPU *cpu)
 {
+    /* The program sits in this poll loop once it is up, and never returns to
+     * main, so this is where a framebuffer dump can actually be taken. */
+    { static long polls; const char *fb;
+      if (++polls == 20000 && (fb = getenv("ELFISH_DUMP_FB"))) elfish_dump_framebuffer(cpu, fb); }
     TRACE("INT16 ah=%02X\n", cpu->ah);
     switch (cpu->ah) {
     case 0x00: case 0x10: {  /* wait for a key, remove it from the buffer */

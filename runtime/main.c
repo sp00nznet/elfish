@@ -10,6 +10,7 @@
 #include "cpu.h"
 #include "segments.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifndef ELFISH_IMAGE_PATH
 #define ELFISH_IMAGE_PATH "build_data/mem_image.bin"
@@ -60,6 +61,10 @@ int main(int argc, char *argv[])
     cpu.es = ELFISH_AUTO_DATA_SEG;
     cpu.cs = ELFISH_ENTRY_SEG;
 
+    /* The DOS extender publishes the framebuffer selector the video driver
+     * later looks for; nothing in the lifted code does it for us. */
+    elfish_video_init(&cpu);
+
     printf("El-Fish Recomp - starting\n");
     printf("  image: %s (%.2f MB)\n", img, ELFISH_IMAGE_SIZE / 1048576.0);
     printf("  entry: seg%u:%04X  stack: seg%u:%04X\n",
@@ -67,6 +72,11 @@ int main(int argc, char *argv[])
     fflush(stdout);
 
     seg122_0000(&cpu);  /* NE entry point */
+
+    /* ELFISH_DUMP_FB=<path> writes what the game drew, so there is something to
+     * look at before there is a window to look at it in. */
+    { const char *fb = getenv("ELFISH_DUMP_FB");
+      if (fb) elfish_dump_framebuffer(&cpu, fb); }
 
     printf("entry returned (ax=%04X)\n", cpu.ax);
     cpu_free(&cpu);
