@@ -235,6 +235,104 @@ def detect_functions(seg: Segment, instructions: list, forced_entries=None) -> l
     return functions
 
 
+# Bytes occupied by each relocation source type.
+_RELOC_SRC_SIZE = {0: 1, 2: 2, 3: 4, 5: 2, 11: 6, 13: 4}
+
+
+def repair_heads(seg: Segment, heads: list) -> list:
+    """Reconcile an analyzer's instruction heads with the segment's relocations.
+
+    A relocation is ground truth about instruction layout: its fixup is a single
+    immediate or displacement field, so [offset, offset+size) lies wholly inside
+    one instruction and that instruction ends exactly where the field ends. No
+    instruction boundary may fall inside it.
+
+    IDA disassembles the RELOCATED image, and TSXLIB patches its FPU-emulation
+    trampolines at load time -- so on those, and only those, its heads describe
+    different bytes than the ones we decode. The split runs on until it happens
+    to resync, and 138 relocation operands in ELFISH.EXE end up straddling two of
+    its instructions. One of them put a head one byte before a far call in
+    seg124, which swallowed the call opcode and turned the rest of the function
+    into garbage that clobbered DS.
+
+    Where a relocation is violated, re-derive that stretch by decoding forward
+    from the nearest earlier head that yields a consistent split. If none does,
+    leave the heads alone rather than guess.
+    """
+    if not seg.data:
+        return heads
+    hset = set(heads)
+    data = seg.data
+    for r in seg.relocations:
+        if r.additive:      # an addend at the START of a trampoline, not an operand
+            continue
+        n = _RELOC_SRC_SIZE.get(r.src_type)
+        if not n:
+            continue
+        start, end = r.offset, r.offset + n
+        if end > len(data):
+            continue
+        if end in hset and not any(start <= h < end for h in hset):
+            continue        # already consistent
+        # An operand never begins an instruction, so the head must be below it.
+        for h in sorted((x for x in hset if x < start), reverse=True)[:8]:
+            chain, pos, d = [], h, Decoder(data, 0)
+            while pos < end:
+                d.pos = pos
+                try:
+                    if d.decode_one() is None or d.pos <= pos:
+                        break
+                except IndexError:
+                    break
+                pos = d.pos
+                chain.append(pos)
+            if pos != end or any(start <= c < end for c in chain[:-1]):
+                continue    # still straddles the operand -- this head is wrong too
+            hset -= {x for x in hset if h < x < end}
+            hset |= set(chain)
+            break
+    # The FPU-emulation trampolines are the sites IDA reads differently, so anchor
+    # on them directly: the addend sits at the START of the instruction, and our
+    # decode of the unpatched bytes gives its true length. Any head inside that is
+    # a leftover from IDA's split of the patched form and decodes as an overlapping
+    # phantom instruction.
+    for r in seg.relocations:
+        if not (r.additive and (r.flags & 3) == 1 and r.ordinal in (22, 23, 24)):
+            continue
+        if r.offset >= len(data):
+            continue
+        d = Decoder(data, 0)
+        d.pos = r.offset
+        try:
+            if d.decode_one() is None or d.pos <= r.offset:
+                continue
+        except IndexError:
+            continue
+        hset -= {x for x in hset if r.offset < x < d.pos}
+        hset.add(r.offset)
+        # If IDA read the trampoline as longer than it is, the bytes between our
+        # end and its next head are unaccounted for. Fill them by decoding, but
+        # only if that lands exactly back on the next head -- otherwise the gap is
+        # data IDA deliberately left unmarked and we would be inventing code.
+        nxt = min((x for x in hset if x > r.offset), default=None)
+        if nxt is None or nxt <= d.pos:
+            continue
+        gap_start, chain, pos = d.pos, [], d.pos
+        while pos < nxt:
+            d.pos = pos
+            try:
+                if d.decode_one() is None or d.pos <= pos:
+                    break
+            except IndexError:
+                break
+            pos = d.pos
+            chain.append(pos)
+        if pos == nxt:
+            hset.add(gap_start)
+            hset |= set(chain[:-1])
+    return sorted(hset)
+
+
 def disassemble_segment(seg: Segment, ne: NEHeader, show_relocs: bool = True) -> tuple:
     """Disassemble a code segment. Returns (instructions, functions, reloc_map)."""
     if not seg.data or not seg.is_code:
@@ -249,7 +347,7 @@ def disassemble_segment(seg: Segment, ne: NEHeader, show_relocs: bool = True) ->
     seg_ida = load_ida_data(ne).get(str(seg.index))
     if seg_ida and seg_ida.get('heads'):
         instructions = []
-        for h in seg_ida['heads']:
+        for h in repair_heads(seg, seg_ida['heads']):
             if 0 <= h < len(seg.data):
                 decoder.pos = h
                 inst = decoder.decode_one()
