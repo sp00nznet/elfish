@@ -313,6 +313,7 @@ void dos_int21(CPU *cpu)
  *
  * ponytail: a register file, not a CRTC -- writes are remembered, not obeyed.
  * Nothing here changes what is displayed, because nothing displays yet. */
+unsigned long g_pw[0x400];
 static uint8_t g_crtc[0x40], g_seq[0x10], g_gfx[0x10], g_atc[0x20];
 static uint8_t g_crtc_i, g_seq_i, g_gfx_i, g_atc_i, g_atc_flip;
 static uint8_t g_dac[768], g_dac_mask = 0xFF;
@@ -329,6 +330,7 @@ static int g_vga_init = 0;
 
 void port_out8(CPU *cpu, uint16_t port, uint8_t val) {
     (void)cpu;
+    { extern unsigned long g_pw[0x400]; if (port < 0x400) g_pw[port]++; }
     switch (port) {
     case 0x3C0:   /* attribute controller: one port, index then data */
         if (!g_atc_flip) g_atc_i = val & 0x1F; else g_atc[g_atc_i] = val;
@@ -450,6 +452,7 @@ void elfish_dump_framebuffer(CPU *cpu, const char *path) {
       for (unsigned i = 0; i < 768; i++) if (g_dac[i]) dz++;
       fprintf(stderr, "wrote %s (%ux%u) nonzero pixels=%u, DAC entries set=%u, sel=%04X\n",
               path, VESA_WIDTH, VESA_HEIGHT, nz, dz, g_fb_sel); }
+    for (int i = 0x3C0; i < 0x3E0; i++) if (g_pw[i]) fprintf(stderr, "  port %03X writes=%lu\n", i, g_pw[i]);
 }
 
 /* ---- VESA / VBE 1.2 (INT 10h AX=4Fxx) ----
