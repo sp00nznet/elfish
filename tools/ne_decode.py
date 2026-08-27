@@ -369,6 +369,52 @@ def repair_heads(seg: Segment, heads: list, entry_targets=()) -> list:
         if pos == nxt:
             hset.add(t)
             hset |= set(chain[:-1])
+    # A relative branch or call inside real code proves its target is an
+    # instruction, exactly as a relocation does. IDA leaves 97 of them unmarked
+    # here, mostly in the FPU-heavy fish-engine segments. Each costs either a
+    # silently dropped branch or a no-op stub -- a call that does nothing and
+    # says nothing. Repeat, because recovering one stretch exposes the branches
+    # inside it.
+    for _round in range(4):
+        want = set()
+        d = Decoder(data, 0)
+        for h in sorted(hset):
+            d.pos = h
+            try:
+                ins = d.decode_one()
+            except IndexError:
+                continue
+            if ins is None or not ins.op1 or ins.mnemonic not in _BRANCH:
+                continue
+            if ins.op1.type not in (OpType.REL8, OpType.REL16):
+                continue
+            t = ins.op1.disp & 0xFFFF
+            if 0 <= t < len(data) and t not in hset:
+                want.add(t)
+        if not want:
+            break
+        grew = False
+        for t in sorted(want):
+            if t in hset:
+                continue
+            nxt = min((x for x in hset if x > t), default=len(data))
+            chain, pos, d = [], t, Decoder(data, 0)
+            while pos < nxt:
+                d.pos = pos
+                try:
+                    if d.decode_one() is None or d.pos <= pos:
+                        break
+                except IndexError:
+                    break
+                pos = d.pos
+                chain.append(pos)
+            if pos != nxt:
+                continue    # does not rejoin the split; leave it alone
+            hset.add(t)
+            hset |= set(chain[:-1])
+            grew = True
+        if not grew:
+            break
     return sorted(hset)
 
 

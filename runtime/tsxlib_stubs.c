@@ -280,6 +280,83 @@ void dos_int21(CPU *cpu)
         break;
     }
 }
+/* ---- VGA registers ----
+ * Index/data pairs with a register file behind them: a write to the index port
+ * selects, the data port then reads or writes that register, and a read gives
+ * back what was written. That last part is the whole point. The driver reads
+ * CRTC 0x13 (the scanline offset the BIOS programmed for the mode) and builds a
+ * pointer out of it; answering 0, as the old stub did, made that pointer null
+ * and the C runtime reported a null-pointer fatal instead.
+ *
+ * ponytail: a register file, not a CRTC -- writes are remembered, not obeyed.
+ * Nothing here changes what is displayed, because nothing displays yet. */
+static uint8_t g_crtc[0x40], g_seq[0x10], g_gfx[0x10], g_atc[0x20];
+static uint8_t g_crtc_i, g_seq_i, g_gfx_i, g_atc_i, g_atc_flip;
+static uint8_t g_dac[768], g_dac_mask = 0xFF;
+static uint16_t g_dac_w, g_dac_r;
+static uint8_t g_misc = 0x67;   /* colour, both page bits, 25MHz -- a VGA default */
+
+/* CRTC 0x13 is the offset register: the BIOS leaves it at bytes-per-line / 8 in
+ * a 256-colour mode, and the driver reads it back rather than assuming. */
+static void vga_set_pitch(unsigned bytes_per_line) {
+    g_crtc[0x13] = (uint8_t)(bytes_per_line / 8u);
+}
+
+static int g_vga_init = 0;
+
+void port_out8(CPU *cpu, uint16_t port, uint8_t val) {
+    (void)cpu;
+    switch (port) {
+    case 0x3C0:   /* attribute controller: one port, index then data */
+        if (!g_atc_flip) g_atc_i = val & 0x1F; else g_atc[g_atc_i] = val;
+        g_atc_flip ^= 1;
+        break;
+    case 0x3C2: g_misc = val; break;
+    case 0x3C4: g_seq_i  = val & 0x0F; break;
+    case 0x3C5: g_seq[g_seq_i] = val; break;
+    case 0x3C6: g_dac_mask = val; break;
+    case 0x3C7: g_dac_r = (uint16_t)(val * 3u); break;
+    case 0x3C8: g_dac_w = (uint16_t)(val * 3u); break;
+    case 0x3C9: g_dac[g_dac_w % 768u] = val; g_dac_w = (uint16_t)((g_dac_w + 1) % 768u); break;
+    case 0x3CE: g_gfx_i  = val & 0x0F; break;
+    case 0x3CF: g_gfx[g_gfx_i] = val; break;
+    case 0x3B4: case 0x3D4: g_crtc_i = val & 0x3F; break;
+    case 0x3B5: case 0x3D5: g_crtc[g_crtc_i] = val; break;
+    default: break;   /* other devices: accepted and dropped */
+    }
+}
+
+uint8_t port_in8(CPU *cpu, uint16_t port) {
+    (void)cpu;
+    /* 80-column text until a mode set says otherwise. */
+    if (!g_vga_init) { g_vga_init = 1; vga_set_pitch(640); }
+    switch (port) {
+    case 0x3C0: return g_atc_i;
+    case 0x3C1: return g_atc[g_atc_i];
+    case 0x3C2: return 0x10;   /* input status 0: switch sense */
+    case 0x3C4: return g_seq_i;
+    case 0x3C5: return g_seq[g_seq_i];
+    case 0x3C6: return g_dac_mask;
+    case 0x3C9: { uint8_t v = g_dac[g_dac_r % 768u]; g_dac_r = (uint16_t)((g_dac_r + 1) % 768u); return v; }
+    case 0x3CC: return g_misc;
+    case 0x3CE: return g_gfx_i;
+    case 0x3CF: return g_gfx[g_gfx_i];
+    case 0x3B4: case 0x3D4: return g_crtc_i;
+    case 0x3B5: case 0x3D5: return g_crtc[g_crtc_i];
+    case 0x3BA: case 0x3DA: {
+        /* Input status 1. Reading it also resets the attribute flip-flop. Bit 0
+         * is display-enable and bit 3 vertical retrace; toggle both, because a
+         * retrace wait spins until it sees the edge it is waiting for and a
+         * constant answer hangs whichever way it is wired. */
+        static uint8_t t;
+        g_atc_flip = 0;
+        t++;
+        return (uint8_t)(((t & 1) ? 0x01 : 0) | ((t & 2) ? 0x08 : 0));
+    }
+    default: return 0xFF;   /* an absent device floats high, not low */
+    }
+}
+
 /* ---- VESA / VBE 1.2 (INT 10h AX=4Fxx) ----
  * The game asks for mode 0x100, 640x400x256, through a banked 64KB window at
  * A000 -- the SVGA path its box advertises. Reporting one mode honestly is
@@ -348,7 +425,8 @@ static void vesa(CPU *cpu) {
         break;
     }
     case 0x02:     /* set mode BX */
-        cpu->ax = ((cpu->bx & 0x7FFF) == VESA_MODE) ? 0x004F : 0x014F;
+        if ((cpu->bx & 0x7FFF) == VESA_MODE) { vga_set_pitch(VESA_WIDTH); cpu->ax = 0x004F; }
+        else cpu->ax = 0x014F;
         break;
     case 0x03:     /* get current mode */
         cpu->bx = VESA_MODE;

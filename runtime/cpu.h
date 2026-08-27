@@ -565,17 +565,12 @@ static inline void cpu_free(CPU *cpu) {
     cpu->sel_base = NULL;
 }
 
-/* ── Port I/O stubs ────────────────────────────────────────── */
-
-static inline uint8_t port_in8(CPU *cpu, uint16_t port) {
-    (void)cpu; (void)port;
-    return 0;
-}
-
-static inline void port_out8(CPU *cpu, uint16_t port, uint8_t val) {
-    (void)cpu; (void)port; (void)val;
-}
-
+/* Port I/O. The VGA register model lives in tsxlib_stubs.c, so these are
+ * declarations rather than the stubs they used to be -- once the game is really
+ * programming the CRTC, "everything reads back zero" is a wrong answer, not a
+ * missing one. */
+uint8_t port_in8(CPU *cpu, uint16_t port);
+void port_out8(CPU *cpu, uint16_t port, uint8_t val);
 /* 16-bit port access. The VGA/VESA and sound registers this game drives are
  * mostly paired 8-bit ports written as one word (index in AL, data in AH), so
  * split it rather than inventing a separate word-wide device model. */
