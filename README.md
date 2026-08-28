@@ -17,10 +17,20 @@ the data directories it names, probes the DOS file-handle limit, initialises the
 mouse, detects VESA, sets mode 0x100, and loads `XX_MDR.DLL`, `\SYSTEM\EPICTURE.DBP`
 and the title artwork.
 
-Capture a frame yourself:
+Run it:
 
 ```bash
-ELFISH_DUMP_FB=menu.ppm build/elfish_test.exe
+cmake -S . -B build -G Ninja -DCMAKE_C_COMPILER=gcc
+cmake --build build
+build/elfish_test.exe          # opens a window; Ctrl-Q or close it to quit
+```
+
+With SDL2 present it opens a 2x window and routes real keyboard and mouse into
+INT 16h and INT 33h. Without SDL2 it still builds and runs headless, and there
+are two knobs for driving it that way:
+
+```bash
+ELFISH_DUMP_FB=menu.ppm ELFISH_KEYS='' build/elfish_test.exe
 python tools/ppm2png.py menu.ppm menu.png
 ```
 
@@ -39,13 +49,14 @@ python tools/ppm2png.py menu.ppm menu.png
   enumerate its fish and tank libraries
 - A VGA register file — CRTC, sequencer, graphics, attribute, DAC — that reads back
   what was written, because the driver checks
+- An SDL2 window showing the framebuffer, with keyboard and mouse wired back into
+  the BIOS interrupts; optional, and the build falls back to headless without it
 - CMake/Ninja build → `elfish_test.exe`, link-clean
 
 ### Remaining Work (prioritized)
 | Issue | Count | Status / Plan |
 |-------|-------|---------------|
 | x87 instructions dropped | 4 | Was 17,355 -- the FWAIT prefix was not being skipped before the x87 opcode, so nearly every FPU instruction lifted to a comment. 18,528 now lift. |
-| No display or input yet | — | The framebuffer is real memory and can be dumped; it needs an SDL2 window, and the keyboard needs wiring to it |
 | Sound | — | Not started: AdLib/SB/MT-32 via `XX_MDR*.DLL` |
 | Unresolved call targets | 96 | Emitted as stubs that do nothing but clean up the caller's stack frame |
 | Dropped out-of-function branches | 42 | Targets that are not instruction boundaries, almost all inside FPU-emulation trampolines |
@@ -134,12 +145,10 @@ cmake --build .
 ```
 
 ### What's Next
-1. **SDL2 window** for the framebuffer that already exists, and route its keyboard and
-   mouse into the INT 16h/33h handlers.
-3. Drive the UI. `ELFISH_KEYS` can already script keypresses; the mouse reports a
-   fixed position, so real pointer movement is what the menu still needs.
-3. The `XX_MDR*.DLL` driver system, which the game opens but we do not load.
-4. Sound.
+1. Drive the UI and see what the menu does -- the window now carries real mouse
+   movement and clicks, so this is a matter of using it.
+2. The `XX_MDR*.DLL` driver system, which the game opens but we do not load.
+3. Sound.
 
 ### Other Executables
 

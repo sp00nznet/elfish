@@ -547,6 +547,7 @@ void elfish_video_init(CPU *cpu) {
     g_fb_bank = 0;
     /* seg29:[0x13] is the video selector; [0x11] is a separate one. */
     mem_write16(cpu, 29, 0x13, g_fb_sel);
+    video_open(VESA_WIDTH, VESA_HEIGHT);
 }
 
 /* Move the 64KB window to `bank`, carrying the guest's pixels with it. */
@@ -773,6 +774,8 @@ static int kb_scripted(void) {
 
 static int kb_poll(void) {
     if (kb_pending >= 0) return kb_pending;
+    int w = video_key();
+    if (w >= 0) return (kb_pending = w);
     int s = kb_scripted();
     if (s >= 0) return (kb_pending = s);
     if (!_kbhit()) return -1;
@@ -786,6 +789,12 @@ void bios_int16(CPU *cpu)
 {
     /* The program sits in this poll loop once it is up, and never returns to
      * main, so this is where a framebuffer dump can actually be taken. */
+    /* The game yields to us here and nowhere else, so this is where the window
+     * gets drawn and its events collected. */
+    vesa_set_bank(cpu, g_fb_bank);      /* fold the live window back into VRAM */
+    video_frame(g_vram, g_dac);
+    if (video_quit_requested()) { video_close(); exit(0); }
+
     { static long polls; const char *fb = getenv("ELFISH_DUMP_FB");
       const char *at = getenv("ELFISH_DUMP_AT");
       if (fb && ++polls == (at ? atol(at) : 20000)) elfish_dump_framebuffer(cpu, fb); }
@@ -820,7 +829,7 @@ void bios_int16(CPU *cpu)
  * for one. There is no window to take real movement from yet, so the pointer
  * sits still in the middle of the screen and no button is ever down.
  * ponytail: position is fixed until SDL provides a real one. */
-static int g_mouse_x = VESA_WIDTH / 2, g_mouse_y = VESA_HEIGHT / 2, g_mouse_shown;
+static int g_mouse_x = VESA_WIDTH / 2, g_mouse_y = VESA_HEIGHT / 2, g_mouse_shown, g_mouse_btn;
 
 void mouse_int33(CPU *cpu)
 {
@@ -834,7 +843,8 @@ void mouse_int33(CPU *cpu)
     case 0x0001: g_mouse_shown = 1; break;   /* show cursor */
     case 0x0002: g_mouse_shown = 0; break;   /* hide cursor */
     case 0x0003:   /* get position and buttons */
-        cpu->bx = 0;                        /* nothing pressed */
+        video_mouse(&g_mouse_x, &g_mouse_y, &g_mouse_btn);
+        cpu->bx = (uint16_t)g_mouse_btn;
         cpu->cx = (uint16_t)g_mouse_x;
         cpu->dx = (uint16_t)g_mouse_y;
         break;

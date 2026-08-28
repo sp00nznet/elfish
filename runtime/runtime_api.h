@@ -29,6 +29,15 @@ void catz_div0(const char *op);
 void elfish_video_init(CPU *cpu);
 void elfish_dump_framebuffer(CPU *cpu, const char *path);
 
+/* The window, when there is one (video_sdl.c). Without SDL2 these are no-ops
+ * and the program runs headless -- which is what ELFISH_DUMP_FB is for. */
+int  video_open(unsigned w, unsigned h);
+void video_frame(const uint8_t *vram, const uint8_t *dac);
+int  video_key(void);
+void video_mouse(int *x, int *y, int *buttons);
+int  video_quit_requested(void);
+void video_close(void);
+
 /* ---- Software interrupts ---- */
 void dos_int21(CPU *cpu);
 void bios_int10(CPU *cpu);
