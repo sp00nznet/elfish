@@ -456,9 +456,15 @@ def disassemble_segment(seg: Segment, ne: NEHeader, show_relocs: bool = True) ->
             raw = inst.raw
             skip = 0
             seg_override = ''
-            if raw[0] in (0x26, 0x2E, 0x36, 0x3E):
-                seg_override = {0x26: 'es', 0x2E: 'cs', 0x36: 'ss', 0x3E: 'ds'}[raw[0]]
-                skip = 1
+            # Skip the prefixes that can sit in front of an x87 opcode, in either
+            # order. FWAIT (0x9B) is the one that matters: this compiler emits it
+            # before nearly every FPU instruction, and only looking past a segment
+            # override left 17,355 of them undecoded as esc_N -- almost the whole
+            # fish engine, silently lifted to a comment.
+            while skip < len(raw) and raw[skip] in (0x9B, 0x26, 0x2E, 0x36, 0x3E):
+                if raw[skip] != 0x9B:
+                    seg_override = {0x26: 'es', 0x2E: 'cs', 0x36: 'ss', 0x3E: 'ds'}[raw[skip]]
+                skip += 1
             if skip < len(raw) - 1 and 0xD8 <= raw[skip] <= 0xDF:
                 opcode = raw[skip]
                 modrm = raw[skip + 1]

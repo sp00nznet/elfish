@@ -44,7 +44,7 @@ python tools/ppm2png.py menu.ppm menu.png
 ### Remaining Work (prioritized)
 | Issue | Count | Status / Plan |
 |-------|-------|---------------|
-| **x87 instructions dropped** | **17,355** | The decoder names only 1,574 of the FPU ops; the rest come out as `esc_N` and are lifted to a comment. Segments 225/228-231 are the fish genetics and rendering engine, so almost none of the actual simulation runs yet. Biggest single gap. |
+| x87 instructions dropped | 4 | Was 17,355 -- the FWAIT prefix was not being skipped before the x87 opcode, so nearly every FPU instruction lifted to a comment. 18,528 now lift. |
 | No display or input yet | — | The framebuffer is real memory and can be dumped; it needs an SDL2 window, and the keyboard needs wiring to it |
 | Sound | — | Not started: AdLib/SB/MT-32 via `XX_MDR*.DLL` |
 | Unresolved call targets | 96 | Emitted as stubs that do nothing but clean up the caller's stack frame |
@@ -121,7 +121,7 @@ Only 12 of 121 code segments directly call TSXLIB — the system layer is thin a
 | Source files | 121 (one per code segment) + generated dispatch/stubs |
 | Functions | 15,213 real, 96 unresolved stubs |
 | Lines of C | 299,380 |
-| x87 instructions lifted | 1,574 of 18,929 (the rest decode as `esc_N`) |
+| x87 instructions lifted | 18,528 of 18,532 |
 | Unique functions reached at runtime | 1,938 |
 | Lifting errors | 0 |
 
@@ -134,14 +134,12 @@ cmake --build .
 ```
 
 ### What's Next
-1. **Decode the remaining x87 instructions.** 17,355 come out as `esc_N` and lift to a
-   comment, which is most of the maths in the fish engine. Nothing simulates until this does.
-2. **SDL2 window** for the framebuffer that already exists, and route its keyboard and
+1. **SDL2 window** for the framebuffer that already exists, and route its keyboard and
    mouse into the INT 16h/33h handlers.
 3. Drive the UI. `ELFISH_KEYS` can already script keypresses; the mouse reports a
    fixed position, so real pointer movement is what the menu still needs.
-4. The `XX_MDR*.DLL` driver system, which the game opens but we do not load.
-5. Sound.
+3. The `XX_MDR*.DLL` driver system, which the game opens but we do not load.
+4. Sound.
 
 ### Other Executables
 
