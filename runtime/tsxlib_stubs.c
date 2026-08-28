@@ -11,6 +11,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <conio.h>
 #include <windows.h>
@@ -155,6 +156,87 @@ void catz_div0(const char *op) {
     fprintf(stderr, "DIVIDE BY ZERO in %s\n", op);
 }
 
+/* ---- Directory search (INT21 AH=1A/4E/4F) ----
+ * DOS returns search results by writing a 43-byte block into the caller's DTA
+ * and keeps its own state in the first 21 bytes of it, so a find-next knows
+ * where the previous find got to. We do the same, storing a slot index there,
+ * which is what lets two searches be open at once without one clobbering the
+ * other. The game enumerates its fish and tank libraries this way.
+ * ponytail: 8 concurrent searches, and a directory read in one go at find-first
+ * so a file appearing mid-scan cannot confuse it. */
+#define DTA_MAGIC 0x454C  /* "EL" -- marks a block as one of ours */
+#define MAX_FIND  8
+
+static struct {
+    int   used;
+    char  pattern[16];   /* the 8.3 mask, uppercased */
+    char  dir[512];      /* host directory being walked */
+    char  names[512][16];
+    int   count, pos;
+} g_find[MAX_FIND];
+
+static uint16_t g_dta_seg, g_dta_off;   /* INT21 AH=1A */
+
+/* Match a DOS 8.3 mask. `*` runs to the end of its field, `?` is one character;
+ * name and mask are both "NAME.EXT" with the dot present only if there is one. */
+static int dos_match(const char *mask, const char *name) {
+    for (;;) {
+        if (*mask == '*') {
+            /* Skip to this field's end in both, then keep comparing. */
+            while (*mask && *mask != '.') mask++;
+            while (*name && *name != '.') name++;
+            continue;
+        }
+        if (!*mask && !*name) return 1;
+        if (!*mask || !*name) return 0;
+        if (*mask != '?' && *mask != *name) return 0;
+        mask++; name++;
+    }
+}
+
+/* Split a mapped host path into its directory and the mask on the end. */
+static void split_mask(const char *path, char *dir, int dmax, char *mask, int mmax) {
+    const char *slash = strrchr(path, '/');
+    if (slash) {
+        int n = (int)(slash - path);
+        if (n >= dmax) n = dmax - 1;
+        memcpy(dir, path, n); dir[n] = 0;
+        snprintf(mask, mmax, "%s", slash + 1);
+    } else {
+        snprintf(dir, dmax, ".");
+        snprintf(mask, mmax, "%s", path);
+    }
+    for (char *q = mask; *q; q++) *q = (char)toupper((unsigned char)*q);
+}
+
+/* Write one result into the DTA and report success. */
+static void find_emit(CPU *cpu, int slot) {
+    const char *nm = g_find[slot].names[g_find[slot].pos++];
+    char full[600];
+    snprintf(full, sizeof(full), "%s/%s", g_find[slot].dir, nm);
+    struct stat st;
+    unsigned long size = (stat(full, &st) == 0) ? (unsigned long)st.st_size : 0;
+    unsigned attr = (stat(full, &st) == 0 && (st.st_mode & S_IFDIR)) ? 0x10u : 0x20u;
+
+    uint16_t s = g_dta_seg, o = g_dta_off;
+    mem_write16(cpu, s, o, DTA_MAGIC);
+    mem_write16(cpu, s, (uint16_t)(o + 2), (uint16_t)slot);
+    mem_write8(cpu, s, (uint16_t)(o + 0x15), (uint8_t)attr);
+    mem_write16(cpu, s, (uint16_t)(o + 0x16), 0);          /* time */
+    mem_write16(cpu, s, (uint16_t)(o + 0x18), 0x2101);     /* date: 1993-08-01 */
+    mem_write16(cpu, s, (uint16_t)(o + 0x1A), (uint16_t)(size & 0xFFFF));
+    mem_write16(cpu, s, (uint16_t)(o + 0x1C), (uint16_t)(size >> 16));
+    for (int i = 0; i < 13; i++)
+        mem_write8(cpu, s, (uint16_t)(o + 0x1E + i), (uint8_t)(i < 12 ? nm[i] : 0));
+    cpu->flags &= ~FLAG_CF;
+    cpu->ax = 0;
+}
+
+static void find_fail(CPU *cpu) {
+    cpu->flags |= FLAG_CF;
+    cpu->ax = 18;   /* no more files */
+}
+
 /* ---- Software interrupts ---- */
 void dos_int21(CPU *cpu)
 {
@@ -282,6 +364,53 @@ void dos_int21(CPU *cpu)
         else { cpu->cx = (uint16_t)attr; cpu->flags &= ~FLAG_CF; }
         break;
     }
+    case 0x1A:  /* set DTA: DS:DX is where search results get written */
+        g_dta_seg = cpu->ds; g_dta_off = cpu->dx;
+        break;
+
+    case 0x4E: {  /* find first: DS:DX=mask, CX=attributes */
+        char name[256], path[512], dir[512], mask[16];
+        read_asciiz(cpu, cpu->ds, cpu->dx, name, sizeof(name));
+        map_path(name, path, sizeof(path));
+        split_mask(path, dir, sizeof(dir), mask, sizeof(mask));
+        int slot = -1;
+        for (int k = 0; k < MAX_FIND; k++) if (!g_find[k].used) { slot = k; break; }
+        if (slot < 0) slot = 0;    /* all busy: reuse the oldest rather than fail */
+        DIR *d = opendir(dir);
+        TRACE("INT21 findfirst '%s' -> dir=%s mask=%s %s\n", name, dir, mask,
+              d ? "ok" : "NO DIR");
+        if (!d) { find_fail(cpu); break; }
+        g_find[slot].used = 1; g_find[slot].count = g_find[slot].pos = 0;
+        snprintf(g_find[slot].dir, sizeof(g_find[slot].dir), "%s", dir);
+        snprintf(g_find[slot].pattern, sizeof(g_find[slot].pattern), "%s", mask);
+        struct dirent *e;
+        while ((e = readdir(d)) && g_find[slot].count < 512) {
+            if (e->d_name[0] == '.') continue;   /* . .. and dotfiles */
+            char up[16];
+            snprintf(up, sizeof(up), "%s", e->d_name);
+            for (char *q = up; *q; q++) *q = (char)toupper((unsigned char)*q);
+            if (dos_match(mask, up))
+                snprintf(g_find[slot].names[g_find[slot].count++], 16, "%s", up);
+        }
+        closedir(d);
+        if (!g_find[slot].count) { g_find[slot].used = 0; find_fail(cpu); break; }
+        find_emit(cpu, slot);
+        break;
+    }
+
+    case 0x4F: {  /* find next: state lives in the DTA the last call wrote */
+        if (mem_read16(cpu, g_dta_seg, g_dta_off) != DTA_MAGIC) { find_fail(cpu); break; }
+        int slot = (int)mem_read16(cpu, g_dta_seg, (uint16_t)(g_dta_off + 2));
+        if (slot < 0 || slot >= MAX_FIND || !g_find[slot].used) { find_fail(cpu); break; }
+        if (g_find[slot].pos >= g_find[slot].count) {
+            g_find[slot].used = 0;   /* exhausted; the slot is free again */
+            find_fail(cpu);
+            break;
+        }
+        find_emit(cpu, slot);
+        break;
+    }
+
     case 0x36:  /* get free disk space: DL=drive -> AX=sectors/cluster,
                  * BX=free clusters, CX=bytes/sector, DX=total clusters.
                  * An ordinary roomy FAT volume; the game only wants to know
@@ -616,8 +745,36 @@ void bios_int10(CPU *cpu)
  * ponytail: console only. SDL takes over once there is a video window. */
 static int kb_pending = -1;   /* one-key pushback for the peek/read pair */
 
+/* ELFISH_KEYS feeds a scripted key sequence, because there is no window to type
+ * into yet and the game only advances when something presses a key. Characters go
+ * as-is; a backslash escape covers the ones you cannot put in an environment
+ * variable: \r Enter, \e Esc, \n newline, \\ a backslash.
+ * ELFISH_KEY_EVERY (default 400) is how many INT 16h polls to wait between them,
+ * so the game finishes reacting to one before the next arrives. */
+static int kb_scripted(void) {
+    static const char *next;
+    static long every, polls;
+    if (!next) {
+        const char *e = getenv("ELFISH_KEYS");
+        next = e ? e : "";
+        e = getenv("ELFISH_KEY_EVERY");
+        every = e ? atol(e) : 400;
+        if (every < 1) every = 1;
+    }
+    if (!*next || ++polls % every) return -1;
+    int c = (unsigned char)*next++;
+    if (c == '\\' && *next) {
+        int esc = (unsigned char)*next++;
+        c = esc == 'r' ? 13 : esc == 'n' ? 10 : esc == 'e' ? 27 : esc;
+    }
+    fprintf(stderr, "key %02X\n", c);
+    return (c & 0xFF) | ((c & 0xFF) << 8);
+}
+
 static int kb_poll(void) {
     if (kb_pending >= 0) return kb_pending;
+    int s = kb_scripted();
+    if (s >= 0) return (kb_pending = s);
     if (!_kbhit()) return -1;
     int c = _getch();
     if (c == 0 || c == 0xE0) kb_pending = (_getch() & 0xFF) << 8;  /* AL=0, AH=scan */
@@ -656,7 +813,44 @@ void bios_int16(CPU *cpu)
         break;
     }
 }
-void mouse_int33(CPU *cpu) { TRACE("INT33 ax=%04X\n", cpu->ax); (void)cpu; }
+/* ---- Mouse (INT 33h) ----
+ * The reset call decides whether the game believes there is a mouse at all: it
+ * wants AX=FFFF and a button count, and the old stub left AX at whatever the
+ * caller had, which reads as "no mouse". A mouse-driven menu then never polls
+ * for one. There is no window to take real movement from yet, so the pointer
+ * sits still in the middle of the screen and no button is ever down.
+ * ponytail: position is fixed until SDL provides a real one. */
+static int g_mouse_x = VESA_WIDTH / 2, g_mouse_y = VESA_HEIGHT / 2, g_mouse_shown;
+
+void mouse_int33(CPU *cpu)
+{
+    TRACE("INT33 ax=%04X\n", cpu->ax);
+    switch (cpu->ax) {
+    case 0x0000:   /* reset and detect */
+        cpu->ax = 0xFFFF;   /* installed */
+        cpu->bx = 2;        /* two buttons */
+        g_mouse_shown = 0;
+        break;
+    case 0x0001: g_mouse_shown = 1; break;   /* show cursor */
+    case 0x0002: g_mouse_shown = 0; break;   /* hide cursor */
+    case 0x0003:   /* get position and buttons */
+        cpu->bx = 0;                        /* nothing pressed */
+        cpu->cx = (uint16_t)g_mouse_x;
+        cpu->dx = (uint16_t)g_mouse_y;
+        break;
+    case 0x0004:   /* set position */
+        g_mouse_x = cpu->cx; g_mouse_y = cpu->dx;
+        break;
+    case 0x0005: case 0x0006:   /* button press / release counts since last ask */
+        cpu->ax = 0; cpu->bx = 0;
+        cpu->cx = (uint16_t)g_mouse_x;
+        cpu->dx = (uint16_t)g_mouse_y;
+        break;
+    default:
+        /* Ranges, sensitivity, event handlers: accepted and ignored. */
+        break;
+    }
+}
 void int_handler(CPU *cpu, int int_num) { TRACE("INT %02X\n", int_num); (void)cpu; (void)int_num; }
 
 /* ---- TSXLIB ordinals ----
