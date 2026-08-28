@@ -30,7 +30,7 @@ INT 16h and INT 33h. Without SDL2 it still builds and runs headless, and there
 are two knobs for driving it that way:
 
 ```bash
-ELFISH_DUMP_FB=menu.ppm ELFISH_KEYS='' build/elfish_test.exe
+ELFISH_DUMP_FB=menu.ppm ELFISH_KEYS='\r' build/elfish_test.exe
 python tools/ppm2png.py menu.ppm menu.png
 ```
 
